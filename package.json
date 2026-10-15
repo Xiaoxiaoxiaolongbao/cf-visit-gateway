@@ -1,0 +1,35 @@
+{
+  "name": "cf-visit-gateway",
+  "version": "1.0.0",
+  "private": false,
+  "type": "module",
+  "description": "Cloudflare Worker 访客统计跳转网关：打开即展示静态页并计数，点击跳转 yzzx.org",
+  "keywords": [
+    "cloudflare-workers",
+    "durable-objects",
+    "visitor-counter",
+    "redirect-gateway",
+    "serverless"
+  ],
+  "license": "MIT",
+  "scripts": {
+    "dev": "wrangler dev",
+    "start": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "check": "wrangler deploy --dry-run --outdir=dist",
+    "test": "node test/run.mjs",
+    "audit": "node scripts/audit-secrets.mjs",
+    "paths": "node scripts/paths.mjs",
+    "build:single": "node scripts/build-single.mjs",
+    "kv:create": "wrangler kv namespace create VISITS",
+    "secret:api": "wrangler secret put API_SECRET",
+    "secret:admin": "wrangler secret put ADMIN_TOKEN"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "wrangler": "^4.0.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

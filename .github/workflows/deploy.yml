@@ -1,0 +1,60 @@
+name: Deploy to Cloudflare Workers
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: 测试 / 审计 / 打包
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: 安装依赖
+        run: npm ci
+      - name: 单元 + 集成测试
+        run: npm test
+      - name: 生成单文件版（顺带校验打包链路）
+        run: npm run build:single
+      - name: 密钥泄露自检
+        run: npm run audit
+        env:
+          # 审计脚本会拿这两个真实值在全仓库搜索，确认它们没有落到任何文件里
+          API_SECRET: ${{ secrets.API_SECRET }}
+          ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
+
+  deploy:
+    name: 部署 Worker
+    needs: verify
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: 安装依赖
+        run: npm ci
+      - name: 推送 secret 并发布
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy
+          # 这两个值由 wrangler-action 直接写进 Worker secret，不进仓库、不进 wrangler.toml
+          secrets: |
+            API_SECRET
+            ADMIN_TOKEN
+        env:
+          API_SECRET: ${{ secrets.API_SECRET }}
+          ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}

@@ -1,0 +1,8 @@
+# 本地开发模板：复制为 .dev.vars（已在 .gitignore 中，不会进仓库）
+# 生成随机串：node -e "console.log(crypto.randomBytes(32).toString('base64url'))"
+#
+# API_SECRET  派生隐藏接口路径 + 派生客户端签名盐（不填则退化为公开默认盐，仅混淆强度）
+# ADMIN_TOKEN 清零统计与运维自检的令牌（不填则这两个接口整体关闭）
+
+API_SECRET=""
+ADMIN_TOKEN=""

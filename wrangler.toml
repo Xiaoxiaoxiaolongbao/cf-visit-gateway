@@ -1,0 +1,42 @@
+#:schema node_modules/wrangler/config-schema.json
+name = "cf-visit-gateway"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+workers_dev = true
+
+# ---------------------------------------------------------------------------
+# 杩愯鏃堕厤缃紙鏀瑰畬鎵ц wrangler deploy 鐢熸晥锛屾棤闇€鏀逛唬鐮侊級
+#
+# 鈿狅笍 瀵嗛挜绫婚厤缃竴寰嬩笉瑕佸啓鍦ㄨ繖涓枃浠堕噷 鈥斺€?瀹冧細杩?git 浠撳簱銆?#    璇风敤 secret 涓嬪彂锛堝€间笉浼氬嚭鐜板湪浠撳簱銆佹瀯寤轰骇鐗┿€佸鎴风鎴栨棩蹇楅噷锛夛細
+#      npx wrangler secret put API_SECRET     # 闅愯棌鎺ュ彛璺緞 + 瀹㈡埛绔鍚嶇洂
+#      npx wrangler secret put ADMIN_TOKEN    # 浠呯敤浜?/<prefix>/r 娓呴浂涓?/<prefix>/h 鑷
+#    鏈厤缃?API_SECRET 鏃跺彲鐢紝浣嗘帴鍙ｈ矾寰勯€€鍖栦负鍏紑榛樿鐩愶紝浠呭叿澶囨贩娣嗗己搴︺€?# ---------------------------------------------------------------------------
+[vars]
+TARGET_URL = "https://yzzx.org"     # 璺宠浆鐩爣銆傚彧鎺ュ彈 http/https锛屽叾瀹冨崗璁嚜鍔ㄥ洖閫€榛樿鍊?SITE_TITLE = "鏈珯璁垮缁熻"           # 椤甸潰鏍囬
+TZ_OFFSET = "8"                     # 缁熻"浠婃棩"鎵€鐢ㄦ椂鍖哄亸绉伙紙灏忔椂锛? = 鍖椾含鏃堕棿锛?AUTO_REDIRECT = "0"                 # >0 鏃堕〉闈㈠€掕鏃?N 绉掕嚜鍔ㄨ烦杞紱0 = 鍙偣鍑昏烦杞?MIN_INTERVAL_MS = "1200"            # 鍚屼竴 IP 鐨勬渶灏忚鏁伴棿闅旓紙闃插埛鏂板埛閲忥級
+ENABLE_BADGE = "false"              # true 鎵嶅紑鏀?/<prefix>/b 寰界珷锛堢瓑鍚屽叕寮€鍙璁℃暟锛?
+# ---------------------------------------------------------------------------
+# 绮剧‘璁℃暟锛欴urable Object锛團ree 璁″垝浠呮敮鎸?SQLite 鍚庣锛屽繀椤荤敤 new_sqlite_classes锛?# ---------------------------------------------------------------------------
+[[durable_objects.bindings]]
+name = "COUNTER"
+class_name = "Counter"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Counter"]
+
+# ---------------------------------------------------------------------------
+# KV 鍥為€€锛堝彲閫夛級锛歚wrangler kv namespace create VISITS` 鍚庡彇娑堟敞閲婂苟濉?id銆?# 浠呭湪鏈粦瀹?COUNTER 鏃剁敓鏁堬紝鐢ㄤ簬鏃犳硶閰嶇疆 Durable Object 鐨勫満鏅紙杩戜技缁熻锛夈€?# ---------------------------------------------------------------------------
+# [[kv_namespaces]]
+# binding = "VISITS"
+# id = "REPLACE_WITH_KV_NAMESPACE_ID"
+
+# ---------------------------------------------------------------------------
+# 鎶?.html 浣滀负鏂囨湰妯″潡鎵撳寘锛學orker 鍐?import 鍗冲彲鎷垮埌瀛楃涓?# ---------------------------------------------------------------------------
+[[rules]]
+type = "Text"
+globs = ["**/*.html"]
+fallthrough = true
+
+[observability]
+enabled = true

@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>{{TITLE}}</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<style nonce="{{NONCE}}">
+  *, *::before, *::after { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; min-height: 100svh; display: flex; align-items: center; justify-content: center;
+    padding: 28px 18px; overflow-x: hidden; background: #070911; color: #e9ecf6;
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    font-size: 16px; line-height: 1.55; -webkit-font-smoothing: antialiased;
+  }
+  body::before {
+    content: ""; position: fixed; inset: -20% -10%; z-index: -2; pointer-events: none; filter: blur(12px);
+    background:
+      radial-gradient(60% 45% at 15% 0%, rgba(99, 102, 241, .30), transparent 65%),
+      radial-gradient(50% 40% at 100% 5%, rgba(34, 211, 238, .20), transparent 60%),
+      radial-gradient(55% 50% at 50% 110%, rgba(168, 85, 247, .18), transparent 65%);
+  }
+  body::after {
+    content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .55;
+    background-image:
+      linear-gradient(rgba(255, 255, 255, .035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, .035) 1px, transparent 1px);
+    background-size: 46px 46px;
+    mask-image: radial-gradient(70% 60% at 50% 40%, #000 20%, transparent 100%);
+  }
+
+  .card {
+    position: relative; width: min(460px, 100%); padding: 26px 24px 18px;
+    border: 1px solid rgba(255, 255, 255, .09); border-radius: 26px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, .055), rgba(255, 255, 255, .018));
+    box-shadow: 0 40px 90px -40px rgba(0, 0, 0, .95), inset 0 1px 0 rgba(255, 255, 255, .05);
+    backdrop-filter: blur(16px) saturate(140%);
+    animation: rise .7s cubic-bezier(.2, .8, .2, 1) both;
+  }
+  @keyframes rise { from { opacity: 0; transform: translateY(14px) scale(.985); } to { opacity: 1; transform: none; } }
+
+  .pill {
+    display: inline-flex; align-items: center; gap: 8px; padding: 5px 12px; border-radius: 999px;
+    font-size: 12.5px; letter-spacing: .02em; color: #a9b4cc;
+    border: 1px solid rgba(255, 255, 255, .10); background: rgba(255, 255, 255, .04);
+  }
+  .pill i { width: 7px; height: 7px; border-radius: 50%; background: #34d399; animation: pulse 2.4s ease-out infinite; }
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(52, 211, 153, .55); }
+    70% { box-shadow: 0 0 0 9px rgba(52, 211, 153, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0); }
+  }
+
+  h1 { margin: 13px 0 0; font-size: 14px; font-weight: 500; letter-spacing: .01em; color: #8e99b3; }
+
+  .hero { margin: 8px 0 0; }
+  .num {
+    font-size: 64px; line-height: 1.06; font-weight: 700; letter-spacing: -.03em;
+    font-variant-numeric: tabular-nums;
+    background: linear-gradient(120deg, #ffffff 8%, #c7d2fe 46%, #67e8f9 92%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    text-shadow: 0 0 60px rgba(99, 102, 241, .35);
+  }
+  .unit { font-size: 12.5px; letter-spacing: .05em; color: #8e99b3; margin-top: 2px; }
+
+  .metrics {
+    display: grid; grid-template-columns: repeat(3, 1fr); list-style: none; margin: 18px 0 0; padding: 14px 0;
+    border-top: 1px solid rgba(255, 255, 255, .07); border-bottom: 1px solid rgba(255, 255, 255, .07);
+  }
+  .metrics li { position: relative; text-align: center; }
+  .metrics li + li::before {
+    content: ""; position: absolute; left: 0; top: 14%; height: 72%; width: 1px; background: rgba(255, 255, 255, .07);
+  }
+  .metrics strong { display: block; font-size: 19px; font-weight: 600; color: #eef2ff; font-variant-numeric: tabular-nums; }
+  .metrics span { font-size: 11.5px; letter-spacing: .04em; color: #7f8aa3; }
+
+  .panel { margin-top: 18px; }
+  .panel-head { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 12px; color: #8e99b3; }
+  .panel-head .muted { color: #647088; }
+  .chart { display: flex; align-items: flex-end; gap: 8px; list-style: none; margin: 0; padding: 0; }
+  .chart li { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .chart .bar { width: 100%; height: 74px; display: flex; align-items: flex-end; }
+  .chart .bar i {
+    display: block; width: 100%; height: 0; border-radius: 8px 8px 4px 4px; opacity: .82;
+    background: linear-gradient(180deg, #818cf8, #22d3ee);
+    box-shadow: 0 6px 18px -10px rgba(99, 102, 241, .95);
+    transition: height .8s cubic-bezier(.2, .8, .2, 1), opacity .25s;
+  }
+  .chart li:hover .bar i { opacity: 1; }
+  .chart em { font-size: 10.5px; font-style: normal; color: #68738c; font-variant-numeric: tabular-nums; }
+  .chart li.today em { color: #a5b4fc; }
+  .chart li.today .bar i { background: linear-gradient(180deg, #a5b4fc, #67e8f9); }
+
+  .cta {
+    position: relative; overflow: hidden; margin-top: 20px; display: flex; align-items: center;
+    justify-content: space-between; gap: 12px; padding: 14px 16px; border-radius: 16px;
+    text-decoration: none; color: #fff; background: linear-gradient(120deg, #4f46e5, #6366f1 45%, #22d3ee 135%);
+    box-shadow: 0 18px 40px -18px rgba(79, 70, 229, .95), inset 0 1px 0 rgba(255, 255, 255, .25);
+    transition: transform .18s cubic-bezier(.2, .8, .2, 1), box-shadow .18s, filter .18s;
+  }
+  .cta::after {
+    content: ""; position: absolute; inset: 0; transform: translateX(-120%); transition: transform .7s ease;
+    background: linear-gradient(100deg, transparent 32%, rgba(255, 255, 255, .22) 50%, transparent 68%);
+  }
+  .cta:hover::after { transform: translateX(120%); }
+  .cta:hover { transform: translateY(-2px); filter: saturate(115%); box-shadow: 0 24px 52px -20px rgba(99, 102, 241, 1); }
+  .cta:active { transform: translateY(0) scale(.995); }
+  .cta:focus-visible { outline: 2px solid #a5b4fc; outline-offset: 3px; }
+  .cta-main { display: flex; flex-direction: column; gap: 1px; }
+  .cta-main strong { font-size: 15.5px; font-weight: 650; letter-spacing: .01em; }
+  .cta-main em { font-size: 11.5px; font-style: normal; letter-spacing: .02em; opacity: .85; }
+  .cta svg { width: 22px; height: 22px; flex: none; transition: transform .18s; }
+  .cta:hover svg { transform: translateX(3px); }
+
+  .status { margin: 14px 2px 0; min-height: 18px; font-size: 12px; color: #7f8aa3; }
+  .status[data-state="warn"] { color: #fcd34d; }
+  .status[data-state="error"] { color: #fca5a5; }
+  .foot {
+    display: flex; justify-content: space-between; gap: 8px; margin-top: 14px; padding-top: 12px;
+    border-top: 1px solid rgba(255, 255, 255, .06); font-size: 11px; color: #5f6a80;
+  }
+
+  @media (max-width: 400px) {
+    .card { padding: 22px 18px 16px; border-radius: 22px; }
+    .num { font-size: 52px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+  }
+</style>
+</head>
+<body>
+<main class="card">
+  <span class="pill"><i></i>访客统计</span>
+  <h1>{{TITLE}}</h1>
+
+  <section class="hero">
+    <div class="num" id="uv" aria-live="polite">&ndash;</div>
+    <div class="unit">位独立访客到访</div>
+  </section>
+
+  <ul class="metrics">
+    <li><strong id="m-total">&ndash;</strong><span>总访问</span></li>
+    <li><strong id="m-today">&ndash;</strong><span>今日</span></li>
+    <li><strong id="m-clicks">&ndash;</strong><span>跳转</span></li>
+  </ul>
+
+  <section class="panel">
+    <div class="panel-head"><span>近 7 天</span><span class="muted" id="range"></span></div>
+    <ul class="chart" id="chart" aria-label="近 7 天访问量"></ul>
+  </section>
+
+  <a class="cta" id="cta" href="{{JUMP}}">
+    <span class="cta-main"><strong>立即前往</strong><em>{{HOST}}</em></span>
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </a>
+
+  <p class="status" id="status" aria-live="polite">正在读取访问数据…</p>
+  <footer class="foot"><span id="since">&nbsp;</span></footer>
+</main>
+
+<script id="cfg" type="application/json" nonce="{{NONCE}}">{{CONFIG_JSON}}</script>
+<script nonce="{{NONCE}}">
+  (function () {
+    "use strict";
+
+    var cfg = {};
+    try { cfg = JSON.parse(document.getElementById("cfg").textContent || "{}"); } catch (err) { cfg = {}; }
+
+    var byId = function (id) { return document.getElementById(id); };
+    var nf = new Intl.NumberFormat("zh-CN");
+    var countUpTimers = new WeakMap();
+
+    function countUp(el, target) {
+      var from = Number(el.dataset.value || 0);
+      var start = performance.now();
+      var duration = 850;
+      var previous = countUpTimers.get(el);
+      if (previous) cancelAnimationFrame(previous);
+      el.dataset.value = String(target);
+      if (from === target || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        el.textContent = nf.format(target);
+        return;
+      }
+      (function step(now) {
+        var p = Math.min(1, (now - start) / duration);
+        var eased = 1 - Math.pow(1 - p, 3);
+        el.textContent = nf.format(Math.round(from + (target - from) * eased));
+        if (p < 1) countUpTimers.set(el, requestAnimationFrame(step));
+      })(start);
+    }
+
+    function setStatus(message, state) {
+      var el = byId("status");
+      el.textContent = message;
+      if (state) el.dataset.state = state; else el.removeAttribute("data-state");
+    }
+
+    function paintChart(series) {
+      var chart = byId("chart");
+      var max = series.reduce(function (m, point) { return Math.max(m, point.pv); }, 0);
+      var todayKey = series.length ? series[series.length - 1].d : "";
+      chart.innerHTML = series.map(function (point) {
+        var ratio = max > 0 ? point.pv / max : 0;
+        var height = point.pv > 0 ? Math.max(8, Math.round(ratio * 100)) : 3;
+        var parts = point.d.split("-");
+        var label = Number(parts[1]) + "/" + Number(parts[2]);
+        var cls = point.d === todayKey ? ' class="today"' : "";
+        return "<li" + cls + ' title="' + point.d + " · " + point.pv + ' 次访问">' +
+          '<span class="bar"><i data-height="' + height + '%"></i></span><em>' + label + "</em></li>";
+      }).join("");
+      byId("range").textContent = series.length ? series[0].d.slice(5) + " → " + todayKey.slice(5) : "";
+      requestAnimationFrame(function () {
+        Array.prototype.forEach.call(chart.querySelectorAll("i"), function (bar) {
+          bar.style.height = bar.dataset.height;
+        });
+      });
+    }
+
+    function render(view) {
+      if (view.configured !== false) {
+        countUp(byId("uv"), view.uv || 0);
+        countUp(byId("m-total"), view.total || 0);
+        countUp(byId("m-today"), view.today || 0);
+        countUp(byId("m-clicks"), view.clicks || 0);
+        paintChart(Array.isArray(view.series) ? view.series : []);
+        byId("since").textContent = view.first
+          ? "自 " + new Date(view.first).toLocaleDateString("zh-CN") + " 起记录"
+          : "尚无记录";
+        setStatus(view.counted === false ? "短时间内的重复访问已合并 · 本次未重复计数" : "本次访问已计入统计");
+      } else {
+        paintChart([]);
+        setStatus("暂无可用统计", "warn");
+      }
+    }
+
+    function request(path, method) {
+      return fetch(path, {
+        method: method || "POST",
+        headers: cfg.k ? { "x-sig": cfg.k } : {},
+        body: method === "GET" ? undefined : "{}",
+        credentials: "same-origin",
+        cache: "no-store"
+      });
+    }
+
+    function scheduleAutoRedirect() {
+      var seconds = Number(cfg.a || 0);
+      if (!seconds) return;
+      var cta = byId("cta");
+      cta.addEventListener("click", function () { seconds = 0; }, { once: true });
+      var timer = setInterval(function () {
+        seconds -= 1;
+        if (seconds <= 0) {
+          clearInterval(timer);
+          location.replace(cta.getAttribute("href"));
+          return;
+        }
+        setStatus(seconds + " 秒后自动前往 " + (cfg.h || ""), "warn");
+      }, 1000);
+    }
+
+    function boot() {
+      request(cfg.v, "POST")
+        .then(function (res) {
+          if (res.ok) return res.json();
+          return request(cfg.s, "GET").then(function (fallback) { return fallback.ok ? fallback.json() : null; });
+        })
+        .then(function (view) {
+          if (view) render(view);
+          else setStatus("统计读取失败，可直接点击上方按钮前往", "error");
+          scheduleAutoRedirect();
+        })
+        .catch(function () {
+          setStatus("统计读取失败，可直接点击上方按钮前往", "error");
+        });
+    }
+
+    byId("cta").addEventListener("click", function () {
+      setStatus("正在前往 " + (cfg.h || "") + " …");
+    });
+
+    boot();
+  })();
+</script>
+</body>
+</html>
