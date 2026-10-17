@@ -43,7 +43,7 @@ await build({
   legalComments: "none",
   minify: false,
   banner: { js: banner },
-  loader: { ".html": "text" },
+  loader: { ".html": "text", ".jpg": "binary" },
 });
 
 const { size } = await stat(outfile);

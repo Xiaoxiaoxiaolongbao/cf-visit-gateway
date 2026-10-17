@@ -45,8 +45,8 @@
 
   /* 顶部圆形奶蛙头像 */
   .avatar {
-    width: 190px; height: 190px; margin: 4px auto 18px; border-radius: 50%;
-    overflow: hidden; position: relative; isolation: isolate;
+    position: relative; width: 190px; height: 190px; margin: 4px auto 18px;
+    border-radius: 50%; overflow: hidden; isolation: isolate; background: #0a1020;
     box-shadow:
       0 0 0 1px rgba(255, 255, 255, .10),
       0 0 0 9px rgba(255, 255, 255, .028),
@@ -54,7 +54,9 @@
       0 0 80px -12px rgba(99, 102, 241, .40);
     animation: float 6s ease-in-out infinite;
   }
-  .avatar svg { display: block; width: 100%; height: 100%; }
+  /* 真实奶蛙素材在上层；万一加载失败，下层的内联 SVG 兜底顶上，不会出现破图 */
+  .avatar .naiwa-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; }
+  .avatar .naiwa-fallback { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; }
   @keyframes float {
     0%, 100% { transform: translateY(0); }
     50% { transform: translateY(-7px); }
@@ -149,9 +151,11 @@
 </head>
 <body>
 <main class="card">
-  <!-- 奶蛙头像：内联手绘 SVG，不引任何外部图片（零外链、可无限放大不失真） -->
+  <!-- 头像：真实奶蛙素材（社区素材仓库 Nailong-Studio/wallpaper 的 4K-抱头震惊-02，见 README）
+       下层内联 SVG 仅作加载失败兜底，不参与正常显示 -->
   <div class="avatar">
-    <svg viewBox="0 0 200 200" role="img" aria-label="奶蛙">
+    <img class="naiwa-img" src="/naiwa.jpg" alt="奶蛙" width="384" height="384" decoding="async" fetchpriority="high">
+    <svg class="naiwa-fallback" viewBox="0 0 200 200" aria-hidden="true">
       <defs>
         <radialGradient id="naiwaBg" cx="50%" cy="34%" r="78%">
           <stop offset="0" stop-color="#1b2540"/>
@@ -164,25 +168,19 @@
         </radialGradient>
       </defs>
       <circle cx="100" cy="100" r="100" fill="url(#naiwaBg)"/>
-      <!-- 头顶奶泡 -->
       <circle cx="78" cy="52" r="17" fill="#ffffff" opacity=".93"/>
       <circle cx="101" cy="41" r="23" fill="#ffffff"/>
       <circle cx="125" cy="53" r="15" fill="#ffffff" opacity=".90"/>
-      <!-- 头 -->
       <ellipse cx="100" cy="120" rx="61" ry="53" fill="url(#naiwaSkin)"/>
-      <!-- 凸出的两只大眼 -->
       <circle cx="64" cy="78" r="26" fill="#f7fffb"/>
       <circle cx="136" cy="78" r="26" fill="#f7fffb"/>
       <circle cx="66" cy="80" r="12" fill="#17281f"/>
       <circle cx="134" cy="80" r="12" fill="#17281f"/>
       <circle cx="61" cy="74" r="4.4" fill="#ffffff"/>
       <circle cx="129" cy="74" r="4.4" fill="#ffffff"/>
-      <!-- 鼻孔 -->
       <circle cx="90" cy="124" r="3.2" fill="#3c6b52" opacity=".65"/>
       <circle cx="110" cy="124" r="3.2" fill="#3c6b52" opacity=".65"/>
-      <!-- 微笑 -->
       <path d="M76 142 q24 22 48 0" fill="none" stroke="#2f5d43" stroke-width="5" stroke-linecap="round"/>
-      <!-- 腮红 -->
       <ellipse cx="46" cy="146" rx="14" ry="9" fill="#ff9db1" opacity=".45"/>
       <ellipse cx="154" cy="146" rx="14" ry="9" fill="#ff9db1" opacity=".45"/>
     </svg>

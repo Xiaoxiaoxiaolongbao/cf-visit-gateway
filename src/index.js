@@ -19,6 +19,7 @@
  */
 
 import PAGE from "./page.html";
+import NAIWA_BYTES from "../assets/naiwa.jpg";
 import { createStore } from "./store.js";
 import { emptyView } from "./stats.js";
 import { DEFAULT_SECRET, derivePaths, mintToken, randomId, safeEqual, verifyToken } from "./secret.js";
@@ -57,8 +58,10 @@ async function route(request, env, ctx) {
   const cfg = config(env);
   const url = new URL(request.url);
 
-  if (url.pathname === "/" || url.pathname === "/index.html") return servePage(cfg);
+  if (url.pathname === "/") return servePage(cfg);
+  if (url.pathname === "/index.html") return servePage(cfg);
   if (url.pathname === "/favicon.svg") return favicon();
+  if (url.pathname === "/naiwa.jpg") return avatarImage();
 
   const paths = await derivePaths(cfg.secret);
   const action = paths.byPath.get(url.pathname);
@@ -431,6 +434,18 @@ function escapeHtml(s) {
 
 function escapeXml(s) {
   return escapeHtml(s);
+}
+
+/** 顶部圆形头像：真实奶蛙素材，按原字节提供（浏览器可缓存 1 天） */
+function avatarImage() {
+  const bytes = NAIWA_BYTES instanceof ArrayBuffer ? new Uint8Array(NAIWA_BYTES) : NAIWA_BYTES;
+  return new Response(bytes, {
+    headers: {
+      "content-type": "image/jpeg",
+      "cache-control": "public, max-age=86400",
+      "x-content-type-options": "nosniff",
+    },
+  });
 }
 
 function favicon() {
