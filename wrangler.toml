@@ -39,7 +39,7 @@ custom_domain = true
 #    未配置 API_SECRET 时可用，但接口路径退化为公开默认盐，仅具备混淆强度。
 # ---------------------------------------------------------------------------
 [vars]
-TARGET_URL = "https://yzzx.org"     # 跳转目标。只接受 http/https，其它协议自动回退默认值
+TARGET_URL = "https://www.yzzx.org"  # 跳转目标。只接受 http/https，其它协议自动回退默认值
 SITE_TITLE = "本站访客统计"           # 页面标题
 TZ_OFFSET = "8"                     # 统计"今日"所用时区偏移（小时，8 = 北京时间）
 AUTO_REDIRECT = "0"                 # >0 时页面倒计时 N 秒自动跳转；0 = 只点击跳转

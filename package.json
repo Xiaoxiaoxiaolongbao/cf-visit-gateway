@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": false,
   "type": "module",
-  "description": "Cloudflare Worker 访客统计跳转网关：打开即展示静态页并计数，点击跳转 yzzx.org",
+  "description": "Cloudflare Worker 访客统计跳转网关：打开即展示静态页并计数，点击跳转 www.yzzx.org",
   "keywords": [
     "cloudflare-workers",
     "durable-objects",
