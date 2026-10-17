@@ -264,7 +264,7 @@ var page_default = `<!DOCTYPE html>
   <p class="headline">你是第<span class="num" id="uv" aria-live="polite">&ndash;</span>位来到该网站的访客</p>
 
   <div class="cta-wrap">
-    <a class="cta" id="cta" href="{{JUMP}}">单击访问</a>
+    <a class="cta" id="cta" href="{{JUMP}}">前往扬州中学</a>
     <p class="cta-target">{{HOST}}</p>
   </div>
 
