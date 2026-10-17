@@ -30,6 +30,21 @@ pattern = "www.heyiwei.asia"
 custom_domain = true
 
 # ---------------------------------------------------------------------------
+# 江苏省奶蛙中学.com（IDN，punycode 形式）
+#
+# apex 上已经存在一条「已代理」的 A 记录，custom_domain 会因记录冲突而失败，
+# 所以 apex 改用 route 挂载：route 不需要新建 DNS 记录，只要该主机名的记录是已代理状态即可生效。
+# www 子域原本没有记录，用 custom_domain 让 Cloudflare 自己创建。
+# ---------------------------------------------------------------------------
+[[routes]]
+pattern = "xn--fiqx8ytpbr55a4embir4ug.com/*"
+zone_name = "xn--fiqx8ytpbr55a4embir4ug.com"
+
+[[routes]]
+pattern = "www.xn--fiqx8ytpbr55a4embir4ug.com"
+custom_domain = true
+
+# ---------------------------------------------------------------------------
 # 运行时配置（改完执行 wrangler deploy 生效，无需改代码）
 #
 # ⚠️ 密钥类配置一律不要写在这个文件里 —— 它会进 git 仓库。
