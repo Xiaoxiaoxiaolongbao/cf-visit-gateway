@@ -111,26 +111,28 @@ npm run build:single
 | 路径 | 方法 | 鉴权 | 说明 |
 | --- | --- | --- | --- |
 | `/` | GET | 公开 | 统计页，唯一入口 |
-| /favicon.svg | GET | 公开 | 站点图标 |
-| `/naiwa.jpg` | GET | 公开 | 首页顶部的圆形奶蛙头像（384×384 JPEG，15.9 KB，缓存 1 天） |
+| `/favicon.svg` | GET | 公开 | 站点图标 |
+| `/naiwa.jpg` | GET | 公开 | 首页顶部的圆形奶蛙头像（512×512 JPEG，约 26 KB，缓存 1 天） |
 | `/{prefix}/g` | GET | 仅前缀 | 302 到目标站并计入跳转次数；**这是唯一可对外分享的隐藏路径** |
-| `/{prefix}/v` | POST | 前缀 + 签名 | 记录一次访问 |
-| `/{prefix}/s` | GET | 前缀 + 签名 | 读取统计 |
+| `/{prefix}/v` | POST | 前缀 + 签名 | 记录一次访问；**只返回位次相关字段**（`uv` / `first` / `configured` / `counted`） |
+| `/{prefix}/s` | GET | 前缀 + 签名 | 读取位次（同样只给 `uv`，不下发其它计数） |
 | `/{prefix}/c` | POST | 前缀 + 签名 | 单独记录跳转 |
 | `/{prefix}/b` | GET | 仅前缀 | 徽章（需 `ENABLE_BADGE=true`） |
 | `/{prefix}/r` | POST | 前缀 + 令牌 | 清零统计，需 `x-admin-token` |
-| `/{prefix}/h` | GET | 前缀 + 令牌 | 运维自检：后端模式、是否加固、可分享链接 |
+| `/{prefix}/h` | GET | 前缀 + 令牌 | 运维自检 + **完整计数**（总访问 / 今日 / 跳转 / 独立访客） |
 | 其它任何路径 | — | — | 空 404 |
 
-统计响应示例（只能通过 `/{prefix}/s` 拿到）：
+浏览器能拿到的只有位次（`/{prefix}/v` 与 `/{prefix}/s` 的响应）：
 
 ```json
-{
-  "configured": true, "counted": true,
-  "uv": 321, "total": 1024, "clicks": 87, "today": 42,
-  "todayKey": "2026-10-15", "first": 1792071702200, "last": 1792071719115,
-  "series": [{ "d": "2026-10-09", "pv": 12 }, "... 共 7 天"]
-}
+{ "configured": true, "counted": true, "uv": 321, "first": 1792071702200 }
+```
+
+总访问、今日、跳转次数、每日明细**不会下发给浏览器**——即使打开 devtools 也看不到。需要看全量时用带令牌的运维接口：
+
+```bash
+curl -s https://<你的域名>/<prefix>/h -H "x-admin-token: <ADMIN_TOKEN>"
+# -> { "mode": "durable", "stats": { "total": 1024, "uv": 321, "today": 42, "clicks": 87 } }
 ```
 
 ## 域名打不开？先跑一次体检
