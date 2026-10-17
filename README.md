@@ -328,8 +328,7 @@ cp .dev.vars.example .dev.vars     # 然后填入两个随机串
 
 **并发高时会丢计数吗？** `durable` 模式不会（所有请求进同一 DO 实例串行处理）。`kv` 回退模式是读-改-写，高并发下会漂移。
 
-**绑自己的域名？** `wrangler.toml` 里已经写好了 `heyiwei.asia` 与 `www.heyiwei.asia` 的 `custom_domain` 路由，`npm run deploy` 即可；换成你的域名就改这两段的 `pattern`。打不开时先 `npm run doctor`，排查流程见上文「域名打不开」。
-
+本项目与扬州中学官方无关
 ## License
 
 [MIT](./LICENSE)
