@@ -39,188 +39,234 @@ var page_default = `<!DOCTYPE html>
 <title>{{TITLE}}</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <style nonce="{{NONCE}}">
+  :root {
+    --ink: #f5f5f7;
+    --ink-dim: #86868b;
+    --ink-faint: #6e6e73;
+    --hairline: rgba(255, 255, 255, .10);
+    --blue: #0071e3;
+    --blue-hover: #0077ed;
+    --ease: cubic-bezier(.16, 1, .3, 1);
+  }
+
   *, *::before, *::after { box-sizing: border-box; }
   html { -webkit-text-size-adjust: 100%; }
+
   body {
-    margin: 0; min-height: 100svh; display: flex; align-items: center; justify-content: center;
-    padding: 28px 18px; overflow-x: hidden; background: #070911; color: #e9ecf6;
-    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
-    font-size: 16px; line-height: 1.55; -webkit-font-smoothing: antialiased;
+    margin: 0; min-height: 100svh; background: #000; color: var(--ink);
+    display: flex; align-items: center; justify-content: center; padding: 44px 24px 40px;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
+                 "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif;
+    font-size: 17px; line-height: 1.47; -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility; overflow-x: hidden;
   }
+
+  /* 舞台顶光：一束自上而下的柔光，模拟发布会打光 */
   body::before {
-    content: ""; position: fixed; inset: -20% -10%; z-index: -2; pointer-events: none; filter: blur(12px);
+    content: ""; position: fixed; left: 0; right: 0; top: 0; height: 76vh;
+    pointer-events: none; z-index: 0;
     background:
-      radial-gradient(60% 45% at 15% 0%, rgba(99, 102, 241, .30), transparent 65%),
-      radial-gradient(50% 40% at 100% 5%, rgba(34, 211, 238, .20), transparent 60%),
-      radial-gradient(55% 50% at 50% 110%, rgba(168, 85, 247, .18), transparent 65%);
+      radial-gradient(42% 40% at 50% 0%, rgba(255, 255, 255, .18), rgba(255, 255, 255, .05) 44%, transparent 72%),
+      radial-gradient(64% 46% at 50% -8%, rgba(140, 180, 255, .10), transparent 72%);
   }
+  /* 地面反光：主体下方的一层极淡反射 */
   body::after {
-    content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .55;
-    background-image:
-      linear-gradient(rgba(255, 255, 255, .035) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255, 255, 255, .035) 1px, transparent 1px);
-    background-size: 46px 46px;
-    mask-image: radial-gradient(70% 60% at 50% 40%, #000 20%, transparent 100%);
+    content: ""; position: fixed; left: 50%; top: 58vh; width: min(720px, 90vw); height: 300px;
+    transform: translateX(-50%); pointer-events: none; z-index: 0; filter: blur(44px);
+    background: radial-gradient(50% 50% at 50% 50%, rgba(255, 255, 255, .065), transparent 72%);
   }
 
-  .card {
-    position: relative; width: min(460px, 100%); padding: 26px 24px 18px;
-    border: 1px solid rgba(255, 255, 255, .09); border-radius: 26px;
-    background: linear-gradient(180deg, rgba(255, 255, 255, .055), rgba(255, 255, 255, .018));
-    box-shadow: 0 40px 90px -40px rgba(0, 0, 0, .95), inset 0 1px 0 rgba(255, 255, 255, .05);
-    backdrop-filter: blur(16px) saturate(140%);
-    animation: rise .7s cubic-bezier(.2, .8, .2, 1) both;
-  }
-  @keyframes rise { from { opacity: 0; transform: translateY(14px) scale(.985); } to { opacity: 1; transform: none; } }
+  main { position: relative; z-index: 1; width: min(660px, 100%); text-align: center; }
 
-  /* 顶部圆形奶蛙头像 */
+  /* 主视觉：产品级圆形主体 + 抛光高光 + 缓慢扫光 */
+  .stage {
+    position: relative; width: min(320px, 58vw, 38vh); aspect-ratio: 1 / 1; margin: 0 auto 34px;
+    animation: reveal 1.25s var(--ease) both;
+  }
+  .stage::before {
+    content: ""; position: absolute; inset: -16%; border-radius: 50%; z-index: 0;
+    background: radial-gradient(circle at 50% 36%, rgba(255, 255, 255, .22), rgba(255, 255, 255, .04) 56%, transparent 72%);
+    filter: blur(22px);
+  }
   .avatar {
-    position: relative; width: 190px; height: 190px; margin: 4px auto 18px;
-    border-radius: 50%; overflow: hidden; isolation: isolate; background: #0a1020;
-    box-shadow:
-      0 0 0 1px rgba(255, 255, 255, .10),
-      0 0 0 9px rgba(255, 255, 255, .028),
-      0 26px 60px -26px rgba(52, 211, 153, .55),
-      0 0 80px -12px rgba(99, 102, 241, .40);
-    animation: float 6s ease-in-out infinite;
+    position: relative; width: 100%; height: 100%; border-radius: 50%; overflow: hidden;
+    isolation: isolate; z-index: 1;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, .14), 0 50px 90px -40px rgba(0, 0, 0, .95);
   }
-  /* 真实奶蛙素材在上层；万一加载失败，下层的内联 SVG 兜底顶上，不会出现破图 */
   .avatar .naiwa-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; }
   .avatar .naiwa-fallback { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; }
-  @keyframes float {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-7px); }
+  /* 抛光高光：左上向外的柔光，像灯打在玻璃罩上 */
+  .avatar::after {
+    content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none; mix-blend-mode: screen;
+    background: radial-gradient(115% 85% at 20% 6%, rgba(255, 255, 255, .26), transparent 48%);
+  }
+  /* 缓慢扫光：9 秒一轮，低透明度，模拟镜面反光掠过 */
+  .avatar::before {
+    content: ""; position: absolute; inset: -30% -120%; z-index: 3; pointer-events: none;
+    background: linear-gradient(100deg, transparent 40%, rgba(255, 255, 255, .09) 50%, transparent 60%);
+    animation: sweep 9s cubic-bezier(.4, 0, .2, 1) infinite;
+  }
+  @keyframes sweep {
+    0%, 16% { transform: translateX(-55%); }
+    52%, 100% { transform: translateX(55%); }
   }
 
-  h1 { margin: 0 0 16px; font-size: 13px; font-weight: 500; letter-spacing: .07em; color: #8e99b3; text-align: center; }
-
-  .hero { text-align: center; margin: 0; }
-  .visitor-line { margin: 0; font-size: 15.5px; line-height: 1.75; color: #c8d2e8; letter-spacing: .01em; }
-  .visitor-line .num {
-    display: inline-block; min-width: 1ch; padding: 0 7px; vertical-align: -5px;
-    font-size: 42px; font-weight: 700; letter-spacing: -.02em; font-variant-numeric: tabular-nums;
-    background: linear-gradient(120deg, #ffffff 8%, #c7d2fe 46%, #67e8f9 92%);
-    -webkit-background-clip: text; background-clip: text; color: transparent;
-    text-shadow: 0 0 50px rgba(99, 102, 241, .38);
+  h1 {
+    margin: 0 0 18px; font-size: 12px; font-weight: 500; letter-spacing: .18em;
+    text-transform: uppercase; color: var(--ink-dim);
+    animation: reveal .9s .08s var(--ease) both;
   }
+
+  .headline {
+    margin: 0; font-size: 21px; font-weight: 400; letter-spacing: -.01em; color: var(--ink-dim);
+    animation: reveal 1s .16s var(--ease) both;
+  }
+  .headline .num {
+    display: inline-block; margin: 0 10px; vertical-align: -14px;
+    font-size: clamp(56px, 11vw, 96px); font-weight: 600; letter-spacing: -.045em;
+    color: var(--ink); font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1, "ss01" 1;
+  }
+
+  .cta-wrap { margin: 30px 0 0; animation: reveal 1s .26s var(--ease) both; }
+  .cta {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 13px 30px; border-radius: 980px; border: 0;
+    background: var(--blue); color: #fff; text-decoration: none;
+    font-size: 17px; font-weight: 500; letter-spacing: -.01em;
+    transition: background-color .22s ease, transform .22s ease;
+  }
+  .cta:hover { background: var(--blue-hover); }
+  .cta:active { transform: scale(.985); }
+  .cta:focus-visible { outline: 2px solid #2997ff; outline-offset: 3px; }
+  .cta em {
+    font-style: normal; font-size: 12px; font-weight: 400; color: var(--ink-faint);
+    display: block; margin-top: 14px;
+  }
+  .cta-target { margin: 14px 0 0; font-size: 12px; color: var(--ink-faint); letter-spacing: .01em; }
 
   .metrics {
-    display: grid; grid-template-columns: repeat(3, 1fr); list-style: none; margin: 18px 0 0; padding: 14px 0;
-    border-top: 1px solid rgba(255, 255, 255, .07); border-bottom: 1px solid rgba(255, 255, 255, .07);
+    display: grid; grid-template-columns: repeat(3, 1fr); list-style: none;
+    margin: 40px 0 0; padding: 18px 0;
+    border-top: 1px solid var(--hairline); border-bottom: 1px solid var(--hairline);
+    animation: reveal 1s .34s var(--ease) both;
   }
-  .metrics li { position: relative; text-align: center; }
+  .metrics li { position: relative; }
   .metrics li + li::before {
-    content: ""; position: absolute; left: 0; top: 14%; height: 72%; width: 1px; background: rgba(255, 255, 255, .07);
+    content: ""; position: absolute; left: 0; top: 10%; height: 80%; width: 1px; background: var(--hairline);
   }
-  .metrics strong { display: block; font-size: 19px; font-weight: 600; color: #eef2ff; font-variant-numeric: tabular-nums; }
-  .metrics span { font-size: 11.5px; letter-spacing: .04em; color: #7f8aa3; }
+  .metrics strong {
+    display: block; font-size: 21px; font-weight: 500; color: var(--ink); letter-spacing: -.01em;
+    font-variant-numeric: tabular-nums;
+  }
+  .metrics span { display: block; margin-top: 2px; font-size: 12px; color: var(--ink-dim); letter-spacing: .02em; }
 
-  .panel { margin-top: 18px; }
-  .panel-head { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 12px; color: #8e99b3; }
-  .panel-head .muted { color: #647088; }
-  .chart { display: flex; align-items: flex-end; gap: 8px; list-style: none; margin: 0; padding: 0; }
-  .chart li { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; }
-  .chart .bar { width: 100%; height: 74px; display: flex; align-items: flex-end; }
+  .panel { margin-top: 30px; animation: reveal 1s .42s var(--ease) both; }
+  .panel-head {
+    display: flex; justify-content: space-between; margin-bottom: 14px;
+    font-size: 12px; color: var(--ink-dim); letter-spacing: .02em;
+  }
+  .panel-head .muted { color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+  .chart { display: flex; align-items: flex-end; gap: 10px; list-style: none; margin: 0; padding: 0; }
+  .chart li { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .chart .bar { width: 100%; height: 60px; display: flex; align-items: flex-end; }
   .chart .bar i {
-    display: block; width: 100%; height: 0; border-radius: 8px 8px 4px 4px; opacity: .82;
-    background: linear-gradient(180deg, #818cf8, #22d3ee);
-    box-shadow: 0 6px 18px -10px rgba(99, 102, 241, .95);
-    transition: height .8s cubic-bezier(.2, .8, .2, 1), opacity .25s;
+    display: block; width: 100%; height: 0; border-radius: 2px;
+    background: #f5f5f7; opacity: .22;
+    transition: height .9s var(--ease), opacity .3s ease;
   }
-  .chart li:hover .bar i { opacity: 1; }
-  .chart em { font-size: 10.5px; font-style: normal; color: #68738c; font-variant-numeric: tabular-nums; }
-  .chart li.today em { color: #a5b4fc; }
-  .chart li.today .bar i { background: linear-gradient(180deg, #a5b4fc, #67e8f9); }
-
-  .cta {
-    position: relative; overflow: hidden; margin-top: 20px; display: flex; align-items: center;
-    justify-content: space-between; gap: 12px; padding: 14px 16px; border-radius: 16px;
-    text-decoration: none; color: #fff; background: linear-gradient(120deg, #4f46e5, #6366f1 45%, #22d3ee 135%);
-    box-shadow: 0 18px 40px -18px rgba(79, 70, 229, .95), inset 0 1px 0 rgba(255, 255, 255, .25);
-    transition: transform .18s cubic-bezier(.2, .8, .2, 1), box-shadow .18s, filter .18s;
+  .chart li:hover .bar i { opacity: .45; }
+  .chart li.today .bar i { opacity: .92; }
+  .chart em {
+    font-size: 11px; font-style: normal; color: var(--ink-faint);
+    font-variant-numeric: tabular-nums; letter-spacing: .02em;
   }
-  .cta::after {
-    content: ""; position: absolute; inset: 0; transform: translateX(-120%); transition: transform .7s ease;
-    background: linear-gradient(100deg, transparent 32%, rgba(255, 255, 255, .22) 50%, transparent 68%);
-  }
-  .cta:hover::after { transform: translateX(120%); }
-  .cta:hover { transform: translateY(-2px); filter: saturate(115%); box-shadow: 0 24px 52px -20px rgba(99, 102, 241, 1); }
-  .cta:active { transform: translateY(0) scale(.995); }
-  .cta:focus-visible { outline: 2px solid #a5b4fc; outline-offset: 3px; }
-  .cta-main { display: flex; flex-direction: column; gap: 1px; }
-  .cta-main strong { font-size: 15.5px; font-weight: 650; letter-spacing: .01em; }
-  .cta-main em { font-size: 11.5px; font-style: normal; letter-spacing: .02em; opacity: .85; }
-  .cta svg { width: 22px; height: 22px; flex: none; transition: transform .18s; }
-  .cta:hover svg { transform: translateX(3px); }
+  .chart li.today em { color: var(--ink-dim); }
 
   .status {
-    display: flex; align-items: center; justify-content: center; gap: 7px;
-    margin: 14px 0 0; min-height: 18px; font-size: 12px; color: #7f8aa3; text-align: center;
+    margin: 34px 0 0; min-height: 18px; font-size: 12px; color: var(--ink-faint); letter-spacing: .01em;
+    animation: reveal 1s .5s var(--ease) both;
   }
-  .status::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #5f6a80; flex: none; }
-  .status[data-state="ok"]::before { background: #34d399; box-shadow: 0 0 8px rgba(52, 211, 153, .85); }
-  .status[data-state="warn"] { color: #fcd34d; }
-  .status[data-state="warn"]::before { background: #fcd34d; }
-  .status[data-state="error"] { color: #fca5a5; }
-  .status[data-state="error"]::before { background: #fca5a5; }
+  .status[data-state="ok"] { color: var(--ink-dim); }
+  .status[data-state="warn"] { color: #ffd60a; }
+  .status[data-state="error"] { color: #ff453a; }
+
   .foot {
-    display: flex; justify-content: center; gap: 8px; margin-top: 14px; padding-top: 12px;
-    border-top: 1px solid rgba(255, 255, 255, .06); font-size: 11px; color: #5f6a80;
+    margin: 18px 0 0; padding-top: 16px; border-top: 1px solid var(--hairline);
+    font-size: 12px; color: var(--ink-faint); letter-spacing: .01em;
+    animation: reveal 1s .56s var(--ease) both;
   }
 
-  @media (max-width: 400px) {
-    .card { padding: 22px 18px 16px; border-radius: 22px; }
-    .avatar { width: 150px; height: 150px; margin-bottom: 14px; }
-    .visitor-line { font-size: 14.5px; }
-    .visitor-line .num { font-size: 36px; }
+  @keyframes reveal {
+    from { opacity: 0; transform: translateY(14px); filter: blur(6px); }
+    to { opacity: 1; transform: none; filter: none; }
   }
+
+  @media (max-width: 520px) {
+    body { padding: 48px 20px 40px; }
+    .stage { width: min(240px, 62vw, 34vh); margin-bottom: 26px; }
+    .headline { font-size: 18px; }
+    .headline .num { vertical-align: -10px; }
+    .metrics { margin-top: 44px; }
+    .chart .bar { height: 56px; }
+  }
+
   @media (prefers-reduced-motion: reduce) {
-    *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+    *, *::before, *::after {
+      animation-duration: .001ms !important;
+      animation-delay: 0ms !important;
+      transition-duration: .001ms !important;
+    }
   }
 </style>
 </head>
 <body>
-<main class="card">
-  <!-- 头像：真实奶蛙素材（社区素材仓库 Nailong-Studio/wallpaper 的 4K-抱头震惊-02，见 README）
+<main>
+  <!-- 主视觉：真实奶蛙素材（社区素材仓库 Nailong-Studio/wallpaper 的 4K-抱头震惊-02，见 README）
        下层内联 SVG 仅作加载失败兜底，不参与正常显示 -->
-  <div class="avatar">
-    <img class="naiwa-img" src="/naiwa.jpg" alt="奶蛙" width="384" height="384" decoding="async" fetchpriority="high">
-    <svg class="naiwa-fallback" viewBox="0 0 200 200" aria-hidden="true">
-      <defs>
-        <radialGradient id="naiwaBg" cx="50%" cy="34%" r="78%">
-          <stop offset="0" stop-color="#1b2540"/>
-          <stop offset="100%" stop-color="#0a1020"/>
-        </radialGradient>
-        <radialGradient id="naiwaSkin" cx="38%" cy="26%" r="86%">
-          <stop offset="0" stop-color="#e6f8ec"/>
-          <stop offset="46%" stop-color="#a9e7bd"/>
-          <stop offset="100%" stop-color="#57b881"/>
-        </radialGradient>
-      </defs>
-      <circle cx="100" cy="100" r="100" fill="url(#naiwaBg)"/>
-      <circle cx="78" cy="52" r="17" fill="#ffffff" opacity=".93"/>
-      <circle cx="101" cy="41" r="23" fill="#ffffff"/>
-      <circle cx="125" cy="53" r="15" fill="#ffffff" opacity=".90"/>
-      <ellipse cx="100" cy="120" rx="61" ry="53" fill="url(#naiwaSkin)"/>
-      <circle cx="64" cy="78" r="26" fill="#f7fffb"/>
-      <circle cx="136" cy="78" r="26" fill="#f7fffb"/>
-      <circle cx="66" cy="80" r="12" fill="#17281f"/>
-      <circle cx="134" cy="80" r="12" fill="#17281f"/>
-      <circle cx="61" cy="74" r="4.4" fill="#ffffff"/>
-      <circle cx="129" cy="74" r="4.4" fill="#ffffff"/>
-      <circle cx="90" cy="124" r="3.2" fill="#3c6b52" opacity=".65"/>
-      <circle cx="110" cy="124" r="3.2" fill="#3c6b52" opacity=".65"/>
-      <path d="M76 142 q24 22 48 0" fill="none" stroke="#2f5d43" stroke-width="5" stroke-linecap="round"/>
-      <ellipse cx="46" cy="146" rx="14" ry="9" fill="#ff9db1" opacity=".45"/>
-      <ellipse cx="154" cy="146" rx="14" ry="9" fill="#ff9db1" opacity=".45"/>
-    </svg>
+  <div class="stage">
+    <div class="avatar">
+      <img class="naiwa-img" src="/naiwa.jpg" alt="奶蛙" width="384" height="384" decoding="async" fetchpriority="high">
+      <svg class="naiwa-fallback" viewBox="0 0 200 200" aria-hidden="true">
+        <defs>
+          <radialGradient id="naiwaBg" cx="50%" cy="34%" r="78%">
+            <stop offset="0" stop-color="#1b2540"/>
+            <stop offset="100%" stop-color="#0a1020"/>
+          </radialGradient>
+          <radialGradient id="naiwaSkin" cx="38%" cy="26%" r="86%">
+            <stop offset="0" stop-color="#e6f8ec"/>
+            <stop offset="46%" stop-color="#a9e7bd"/>
+            <stop offset="100%" stop-color="#57b881"/>
+          </radialGradient>
+        </defs>
+        <circle cx="100" cy="100" r="100" fill="url(#naiwaBg)"/>
+        <circle cx="78" cy="52" r="17" fill="#ffffff" opacity=".93"/>
+        <circle cx="101" cy="41" r="23" fill="#ffffff"/>
+        <circle cx="125" cy="53" r="15" fill="#ffffff" opacity=".90"/>
+        <ellipse cx="100" cy="120" rx="61" ry="53" fill="url(#naiwaSkin)"/>
+        <circle cx="64" cy="78" r="26" fill="#f7fffb"/>
+        <circle cx="136" cy="78" r="26" fill="#f7fffb"/>
+        <circle cx="66" cy="80" r="12" fill="#17281f"/>
+        <circle cx="134" cy="80" r="12" fill="#17281f"/>
+        <circle cx="61" cy="74" r="4.4" fill="#ffffff"/>
+        <circle cx="129" cy="74" r="4.4" fill="#ffffff"/>
+        <circle cx="90" cy="124" r="3.2" fill="#3c6b52" opacity=".65"/>
+        <circle cx="110" cy="124" r="3.2" fill="#3c6b52" opacity=".65"/>
+        <path d="M76 142 q24 22 48 0" fill="none" stroke="#2f5d43" stroke-width="5" stroke-linecap="round"/>
+        <ellipse cx="46" cy="146" rx="14" ry="9" fill="#ff9db1" opacity=".45"/>
+        <ellipse cx="154" cy="146" rx="14" ry="9" fill="#ff9db1" opacity=".45"/>
+      </svg>
+    </div>
   </div>
 
   <h1>{{TITLE}}</h1>
 
-  <section class="hero">
-    <p class="visitor-line">你是第 <span class="num" id="uv" aria-live="polite">&ndash;</span> 位来到该网站的访客</p>
-  </section>
+  <p class="headline">你是第<span class="num" id="uv" aria-live="polite">&ndash;</span>位来到该网站的访客</p>
+
+  <div class="cta-wrap">
+    <a class="cta" id="cta" href="{{JUMP}}">单击访问</a>
+    <p class="cta-target">{{HOST}}</p>
+  </div>
 
   <ul class="metrics">
     <li><strong id="m-total">&ndash;</strong><span>总访问</span></li>
@@ -232,11 +278,6 @@ var page_default = `<!DOCTYPE html>
     <div class="panel-head"><span>近 7 天</span><span class="muted" id="range"></span></div>
     <ul class="chart" id="chart" aria-label="近 7 天访问量"></ul>
   </section>
-
-  <a class="cta" id="cta" href="{{JUMP}}">
-    <span class="cta-main"><strong>单击访问</strong><em>{{HOST}}</em></span>
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-  </a>
 
   <p class="status" id="status" aria-live="polite">正在读取访问数据…</p>
   <footer class="foot"><span id="since">&nbsp;</span></footer>
@@ -257,7 +298,7 @@ var page_default = `<!DOCTYPE html>
     function countUp(el, target) {
       var from = Number(el.dataset.value || 0);
       var start = performance.now();
-      var duration = 850;
+      var duration = 900;
       var previous = countUpTimers.get(el);
       if (previous) cancelAnimationFrame(previous);
       el.dataset.value = String(target);
@@ -267,7 +308,7 @@ var page_default = `<!DOCTYPE html>
       }
       (function step(now) {
         var p = Math.min(1, (now - start) / duration);
-        var eased = 1 - Math.pow(1 - p, 3);
+        var eased = 1 - Math.pow(1 - p, 4);
         el.textContent = nf.format(Math.round(from + (target - from) * eased));
         if (p < 1) countUpTimers.set(el, requestAnimationFrame(step));
       })(start);
