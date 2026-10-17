@@ -40,175 +40,224 @@ var page_default = `<!DOCTYPE html>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <style nonce="{{NONCE}}">
   :root {
-    --ink: #f5f5f7;
-    --ink-dim: #86868b;
-    --ink-faint: #6e6e73;
-    --hairline: rgba(255, 255, 255, .10);
-    --blue: #0071e3;
-    --blue-hover: #0077ed;
+    --paper: #f5f5f7;
+    --ink: #8a8a8f;
+    --ink-soft: #63636a;
+    --hair: rgba(255, 255, 255, .085);
+    --hair-strong: rgba(255, 255, 255, .16);
+    --black: #050506;
     --ease: cubic-bezier(.16, 1, .3, 1);
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
   }
 
   *, *::before, *::after { box-sizing: border-box; }
   html { -webkit-text-size-adjust: 100%; }
+  ::selection { background: rgba(245, 245, 247, .18); color: #fff; }
 
   body {
-    margin: 0; min-height: 100svh; background: #000; color: var(--ink);
-    display: flex; align-items: center; justify-content: center; padding: 44px 24px 40px;
+    margin: 0; min-height: 100svh; background: var(--black); color: var(--paper);
+    display: flex; align-items: center; justify-content: center;
+    padding: 40px 24px 36px; overflow-x: hidden;
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
                  "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif;
-    font-size: 17px; line-height: 1.47; -webkit-font-smoothing: antialiased;
-    text-rendering: optimizeLegibility; overflow-x: hidden;
+    font-size: 16px; line-height: 1.5; -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent; text-rendering: optimizeLegibility;
   }
 
-  /* 舞台顶光：一束自上而下的柔光，模拟发布会打光 */
+  /* 单一侧光：左上偏心，避免对称的「打光感」；用极慢的漂移代替循环动画的廉价感 */
   body::before {
-    content: ""; position: fixed; left: 0; right: 0; top: 0; height: 76vh;
-    pointer-events: none; z-index: 0;
+    content: ""; position: fixed; left: 50%; top: -18vh; width: 120vw; height: 96vh;
+    transform: translateX(-50%); pointer-events: none; z-index: 0;
     background:
-      radial-gradient(42% 40% at 50% 0%, rgba(255, 255, 255, .18), rgba(255, 255, 255, .05) 44%, transparent 72%),
-      radial-gradient(64% 46% at 50% -8%, rgba(140, 180, 255, .10), transparent 72%);
+      radial-gradient(38% 34% at 42% 12%, rgba(255, 255, 255, .13), transparent 68%),
+      radial-gradient(60% 42% at 56% 0%, rgba(190, 205, 255, .07), transparent 72%);
+    animation: drift 26s ease-in-out infinite alternate;
   }
-  /* 地面反光：主体下方的一层极淡反射 */
+  @keyframes drift {
+    from { transform: translateX(-51%) translateY(-1.5%); }
+    to { transform: translateX(-49%) translateY(1.5%); }
+  }
+
+  /* 纸感颗粒：消除大面积渐变的色带，让黑看起来有材质而不是纯色块 */
   body::after {
-    content: ""; position: fixed; left: 50%; top: 58vh; width: min(720px, 90vw); height: 300px;
-    transform: translateX(-50%); pointer-events: none; z-index: 0; filter: blur(44px);
-    background: radial-gradient(50% 50% at 50% 50%, rgba(255, 255, 255, .065), transparent 72%);
+    content: ""; position: fixed; inset: 0; z-index: 3; pointer-events: none; opacity: .032;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
   }
 
-  main { position: relative; z-index: 1; width: min(660px, 100%); text-align: center; }
+  main { position: relative; z-index: 1; width: min(620px, 100%); text-align: center; }
 
-  /* 主视觉：产品级圆形主体 + 抛光高光 + 缓慢扫光 */
-  .stage {
-    position: relative; width: min(320px, 58vw, 38vh); aspect-ratio: 1 / 1; margin: 0 auto 34px;
-    animation: reveal 1.25s var(--ease) both;
+  /* 顶部分隔细线：两端渐隐，像印刷品的裁切边 */
+  .seam {
+    height: 1px; width: 100%; margin: 0 0 34px;
+    background: linear-gradient(90deg, transparent, var(--hair-strong) 22%, var(--hair-strong) 78%, transparent);
+    animation: reveal 1.1s var(--ease) both;
   }
-  .stage::before {
-    content: ""; position: absolute; inset: -16%; border-radius: 50%; z-index: 0;
-    background: radial-gradient(circle at 50% 36%, rgba(255, 255, 255, .22), rgba(255, 255, 255, .04) 56%, transparent 72%);
-    filter: blur(22px);
+
+  .kicker {
+    margin: 0 0 30px; font-family: var(--mono); font-size: 10.5px; font-weight: 400;
+    letter-spacing: .22em; text-transform: uppercase; color: var(--ink-soft);
+    animation: reveal 1.1s .06s var(--ease) both;
   }
-  .avatar {
-    position: relative; width: 100%; height: 100%; border-radius: 50%; overflow: hidden;
-    isolation: isolate; z-index: 1;
-    box-shadow: 0 0 0 1px rgba(255, 255, 255, .14), 0 50px 90px -40px rgba(0, 0, 0, .95);
+
+  /* 展陈主体：细描边圆框 + 一圈极窄的镜面高光弧 */
+  .exhibit { position: relative; width: min(300px, 56vw, 34vh); margin: 0 auto; animation: reveal 1.3s .1s var(--ease) both; }
+  .frame {
+    position: relative; aspect-ratio: 1 / 1; border-radius: 50%; overflow: hidden;
+    box-shadow: 0 0 0 1px var(--hair-strong);
   }
-  .avatar .naiwa-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; }
-  .avatar .naiwa-fallback { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; }
-  /* 抛光高光：左上向外的柔光，像灯打在玻璃罩上 */
-  .avatar::after {
+  .frame .naiwa-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; }
+  .frame .naiwa-fallback { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; }
+  /* 镜面高光：只占左上约 1/4 的一层柔光，不做全屏 bloom */
+  .frame::after {
     content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none; mix-blend-mode: screen;
-    background: radial-gradient(115% 85% at 20% 6%, rgba(255, 255, 255, .26), transparent 48%);
+    background: radial-gradient(58% 46% at 26% 12%, rgba(255, 255, 255, .20), transparent 62%);
   }
-  /* 缓慢扫光：9 秒一轮，低透明度，模拟镜面反光掠过 */
-  .avatar::before {
-    content: ""; position: absolute; inset: -30% -120%; z-index: 3; pointer-events: none;
-    background: linear-gradient(100deg, transparent 40%, rgba(255, 255, 255, .09) 50%, transparent 60%);
-    animation: sweep 9s cubic-bezier(.4, 0, .2, 1) infinite;
+  /* 22 秒一轮、5% 透明度的掠过光，慢到几乎察觉不到 */
+  .frame::before {
+    content: ""; position: absolute; inset: -35% -130%; z-index: 3; pointer-events: none;
+    background: linear-gradient(104deg, transparent 44%, rgba(255, 255, 255, .05) 50%, transparent 56%);
+    animation: pass 22s cubic-bezier(.4, 0, .2, 1) infinite;
   }
-  @keyframes sweep {
-    0%, 16% { transform: translateX(-55%); }
-    52%, 100% { transform: translateX(55%); }
+  @keyframes pass {
+    0%, 34% { transform: translateX(-52%); }
+    62%, 100% { transform: translateX(52%); }
   }
 
-  h1 {
-    margin: 0 0 18px; font-size: 12px; font-weight: 500; letter-spacing: .18em;
-    text-transform: uppercase; color: var(--ink-dim);
-    animation: reveal .9s .08s var(--ease) both;
+  /* 展签：把吐槽排成博物馆标签的样子，这是本页唯一的玩笑装置 */
+  .plate {
+    margin: 22px 0 0; padding: 0 0 20px;
+    font-family: var(--mono); font-size: 10.5px; line-height: 1.9;
+    letter-spacing: .1em; color: var(--ink-soft); text-transform: none;
   }
+  .plate b { display: block; font-weight: 500; color: var(--ink); letter-spacing: .12em; }
+  .plate span { display: block; }
 
   .headline {
-    margin: 0; font-size: 21px; font-weight: 400; letter-spacing: -.01em; color: var(--ink-dim);
-    animation: reveal 1s .16s var(--ease) both;
+    margin: 34px 0 0; font-size: 15px; font-weight: 400; letter-spacing: .02em; color: var(--ink);
+    animation: reveal 1.1s .2s var(--ease) both;
   }
   .headline .num {
-    display: inline-block; margin: 0 10px; vertical-align: -14px;
-    font-size: clamp(56px, 11vw, 96px); font-weight: 600; letter-spacing: -.045em;
-    color: var(--ink); font-variant-numeric: tabular-nums;
-    font-feature-settings: "tnum" 1, "ss01" 1;
+    display: block; margin: 6px 0 2px;
+    font-size: clamp(72px, 14vw, 108px); font-weight: 500; letter-spacing: -.055em;
+    line-height: 1; color: var(--paper); font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
   }
+  .serial {
+    margin: 18px 0 0; font-family: var(--mono); font-size: 10px; letter-spacing: .24em;
+    text-transform: uppercase; color: var(--ink-soft);
+    animation: reveal 1.1s .26s var(--ease) both;
+  }
+  .serial::before, .serial::after { content: "—"; margin: 0 10px; color: var(--hair-strong); }
 
-  .cta-wrap { margin: 30px 0 0; animation: reveal 1s .26s var(--ease) both; }
+  .cta-wrap { margin: 38px 0 0; animation: reveal 1.1s .32s var(--ease) both; }
   .cta {
-    display: inline-flex; align-items: center; gap: 8px;
-    padding: 13px 30px; border-radius: 980px; border: 0;
-    background: var(--blue); color: #fff; text-decoration: none;
-    font-size: 17px; font-weight: 500; letter-spacing: -.01em;
-    transition: background-color .22s ease, transform .22s ease;
+    display: inline-flex; align-items: center; gap: 10px;
+    padding: 13px 28px; border-radius: 980px; border: 0;
+    background: var(--paper); color: #0a0a0c; text-decoration: none;
+    font-size: 15px; font-weight: 500; letter-spacing: .01em;
+    transition: background-color .25s ease, transform .25s var(--ease);
   }
-  .cta:hover { background: var(--blue-hover); }
-  .cta:active { transform: scale(.985); }
-  .cta:focus-visible { outline: 2px solid #2997ff; outline-offset: 3px; }
-  .cta em {
-    font-style: normal; font-size: 12px; font-weight: 400; color: var(--ink-faint);
-    display: block; margin-top: 14px;
+  .cta:hover { background: #ffffff; }
+  .cta:active { transform: scale(.988); }
+  .cta:focus-visible { outline: 2px solid var(--hair-strong); outline-offset: 4px; }
+  .cta svg { width: 13px; height: 13px; }
+  .dest {
+    margin: 16px 0 0; font-family: var(--mono); font-size: 10px; letter-spacing: .2em;
+    text-transform: uppercase; color: var(--ink-soft);
   }
-  .cta-target { margin: 14px 0 0; font-size: 12px; color: var(--ink-faint); letter-spacing: .01em; }
 
   .metrics {
     display: grid; grid-template-columns: repeat(3, 1fr); list-style: none;
-    margin: 40px 0 0; padding: 18px 0;
-    border-top: 1px solid var(--hairline); border-bottom: 1px solid var(--hairline);
-    animation: reveal 1s .34s var(--ease) both;
+    margin: 46px 0 0; padding: 22px 0 20px;
+    border-top: 1px solid var(--hair); border-bottom: 1px solid var(--hair);
+    animation: reveal 1.1s .4s var(--ease) both;
   }
   .metrics li { position: relative; }
   .metrics li + li::before {
-    content: ""; position: absolute; left: 0; top: 10%; height: 80%; width: 1px; background: var(--hairline);
+    content: ""; position: absolute; left: 0; top: 6%; height: 88%; width: 1px; background: var(--hair);
+  }
+  .metrics em {
+    display: block; margin-bottom: 7px; font-family: var(--mono); font-style: normal;
+    font-size: 9.5px; letter-spacing: .2em; text-transform: uppercase; color: var(--ink-soft);
   }
   .metrics strong {
-    display: block; font-size: 21px; font-weight: 500; color: var(--ink); letter-spacing: -.01em;
-    font-variant-numeric: tabular-nums;
+    display: block; font-size: 20px; font-weight: 500; color: var(--paper);
+    letter-spacing: -.01em; font-variant-numeric: tabular-nums;
   }
-  .metrics span { display: block; margin-top: 2px; font-size: 12px; color: var(--ink-dim); letter-spacing: .02em; }
+  .metrics span { display: block; margin-top: 3px; font-size: 11px; color: var(--ink-soft); letter-spacing: .04em; }
 
-  .panel { margin-top: 30px; animation: reveal 1s .42s var(--ease) both; }
+  .panel { margin-top: 32px; animation: reveal 1.1s .46s var(--ease) both; }
   .panel-head {
-    display: flex; justify-content: space-between; margin-bottom: 14px;
-    font-size: 12px; color: var(--ink-dim); letter-spacing: .02em;
+    display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 16px;
+    font-family: var(--mono); font-size: 9.5px; letter-spacing: .2em;
+    text-transform: uppercase; color: var(--ink-soft);
   }
-  .panel-head .muted { color: var(--ink-faint); font-variant-numeric: tabular-nums; }
-  .chart { display: flex; align-items: flex-end; gap: 10px; list-style: none; margin: 0; padding: 0; }
-  .chart li { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 8px; }
-  .chart .bar { width: 100%; height: 60px; display: flex; align-items: flex-end; }
+  .panel-head .muted { font-variant-numeric: tabular-nums; letter-spacing: .14em; }
+  .chart { display: flex; align-items: flex-end; gap: 14px; list-style: none; margin: 0; padding: 0 2px; }
+  .chart li { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 9px; }
+  .chart .bar { width: 100%; max-width: 22px; height: 58px; display: flex; align-items: flex-end; }
   .chart .bar i {
-    display: block; width: 100%; height: 0; border-radius: 2px;
-    background: #f5f5f7; opacity: .22;
-    transition: height .9s var(--ease), opacity .3s ease;
+    display: block; width: 100%; height: 0; border-radius: 1.5px;
+    background: var(--paper); opacity: .16;
+    transition: height .95s var(--ease), opacity .35s ease;
   }
-  .chart li:hover .bar i { opacity: .45; }
-  .chart li.today .bar i { opacity: .92; }
+  .chart li:hover .bar i { opacity: .34; }
+  .chart li.today .bar i { opacity: .88; }
   .chart em {
-    font-size: 11px; font-style: normal; color: var(--ink-faint);
-    font-variant-numeric: tabular-nums; letter-spacing: .02em;
+    font-family: var(--mono); font-style: normal; font-size: 9px; letter-spacing: .08em;
+    color: var(--ink-soft); font-variant-numeric: tabular-nums;
   }
-  .chart li.today em { color: var(--ink-dim); }
+  .chart li.today em { color: var(--ink); }
 
   .status {
-    margin: 34px 0 0; min-height: 18px; font-size: 12px; color: var(--ink-faint); letter-spacing: .01em;
-    animation: reveal 1s .5s var(--ease) both;
+    margin: 32px 0 0; min-height: 17px; font-size: 11.5px; letter-spacing: .03em; color: var(--ink-soft);
+    animation: reveal 1.1s .52s var(--ease) both;
   }
-  .status[data-state="ok"] { color: var(--ink-dim); }
-  .status[data-state="warn"] { color: #ffd60a; }
-  .status[data-state="error"] { color: #ff453a; }
+  .status[data-state="ok"] { color: var(--ink); }
+  .status[data-state="warn"] { color: #d8bb62; }
+  .status[data-state="error"] { color: #d98b86; }
 
   .foot {
-    margin: 18px 0 0; padding-top: 16px; border-top: 1px solid var(--hairline);
-    font-size: 12px; color: var(--ink-faint); letter-spacing: .01em;
-    animation: reveal 1s .56s var(--ease) both;
+    margin: 20px 0 0; padding-top: 18px; border-top: 1px solid var(--hair);
+    font-size: 10.5px; line-height: 1.9; color: var(--ink-soft); letter-spacing: .03em;
+    animation: reveal 1.1s .58s var(--ease) both;
   }
+  .foot b { font-weight: 400; color: var(--ink); font-family: var(--mono); letter-spacing: .1em; }
+  .foot span { display: block; }
 
   @keyframes reveal {
-    from { opacity: 0; transform: translateY(14px); filter: blur(6px); }
+    from { opacity: 0; transform: translateY(10px); filter: blur(5px); }
     to { opacity: 1; transform: none; filter: none; }
   }
 
+  /* 矮屏：压缩纵向节奏，保证主按钮始终留在首屏 */
+  @media (max-height: 880px) {
+    .seam { margin-bottom: 22px; }
+    .kicker { margin-bottom: 18px; }
+    .exhibit { width: min(250px, 46vw, 29vh); }
+    .plate { margin-top: 16px; padding-bottom: 12px; font-size: 10px; line-height: 1.7; }
+    .plate .detail { display: none; }
+    .headline { margin-top: 22px; }
+    .headline .num { font-size: clamp(54px, 9.4vh, 86px); margin: 4px 0 0; }
+    .serial { display: none; }
+    .cta-wrap { margin-top: 26px; }
+    .metrics { margin-top: 32px; padding: 16px 0 14px; }
+    .panel { margin-top: 24px; }
+    .status { margin-top: 24px; }
+    .foot { margin-top: 16px; padding-top: 14px; }
+  }
   @media (max-width: 520px) {
-    body { padding: 48px 20px 40px; }
-    .stage { width: min(240px, 62vw, 34vh); margin-bottom: 26px; }
-    .headline { font-size: 18px; }
-    .headline .num { vertical-align: -10px; }
-    .metrics { margin-top: 44px; }
-    .chart .bar { height: 56px; }
+    body { padding: 32px 20px 28px; }
+    .seam { margin-bottom: 26px; }
+    .kicker { margin-bottom: 24px; letter-spacing: .16em; }
+    .exhibit { width: min(232px, 60vw, 30vh); }
+    .plate { margin-top: 18px; padding-bottom: 16px; }
+    .headline { margin-top: 26px; }
+    .cta-wrap { margin-top: 30px; }
+    .metrics { margin-top: 36px; }
+    .chart { gap: 10px; }
+    .chart .bar { height: 48px; }
+    .foot { font-size: 10px; }
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -222,10 +271,13 @@ var page_default = `<!DOCTYPE html>
 </head>
 <body>
 <main>
-  <!-- 主视觉：真实奶蛙素材（社区素材仓库 Nailong-Studio/wallpaper 的 4K-抱头震惊-02，见 README）
+  <div class="seam"></div>
+  <p class="kicker">Naiwa Middle School &middot; Jiangsu &middot; Est. 2026</p>
+
+  <!-- 展陈主体：真实奶蛙素材（社区素材仓库 Nailong-Studio/wallpaper 的 4K-抱头震惊-02，见 README）
        下层内联 SVG 仅作加载失败兜底，不参与正常显示 -->
-  <div class="stage">
-    <div class="avatar">
+  <div class="exhibit">
+    <div class="frame">
       <img class="naiwa-img" src="/naiwa.jpg" alt="奶蛙" width="384" height="384" decoding="async" fetchpriority="high">
       <svg class="naiwa-fallback" viewBox="0 0 200 200" aria-hidden="true">
         <defs>
@@ -259,28 +311,45 @@ var page_default = `<!DOCTYPE html>
     </div>
   </div>
 
-  <h1>{{TITLE}}</h1>
+  <!-- 展签：本页唯一的玩笑装置，写成博物馆标签的格式 -->
+  <p class="plate">
+    <b>奶蛙 &middot; 抱头震惊 &middot; № 02</b>
+    <span class="detail">态度：震惊 / 材质：奶 / 来源：民间</span>
+    <span class="detail">状态：常设展 &middot; 无需门票</span>
+  </p>
 
-  <p class="headline">你是第<span class="num" id="uv" aria-live="polite">&ndash;</span>位来到该网站的访客</p>
+  <p class="headline">
+    你是第
+    <span class="num" id="uv" aria-live="polite">&ndash;</span>
+    位来到该网站的访客
+  </p>
+
+  <p class="serial">Visitor Record</p>
 
   <div class="cta-wrap">
-    <a class="cta" id="cta" href="{{JUMP}}">前往扬州中学</a>
-    <p class="cta-target">{{HOST}}</p>
+    <a class="cta" id="cta" href="{{JUMP}}">前往扬州中学
+      <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M13 6l6 6-6 6"/></svg>
+    </a>
+    <p class="dest">{{HOST}}</p>
   </div>
 
   <ul class="metrics">
-    <li><strong id="m-total">&ndash;</strong><span>总访问</span></li>
-    <li><strong id="m-today">&ndash;</strong><span>今日</span></li>
-    <li><strong id="m-clicks">&ndash;</strong><span>跳转</span></li>
+    <li><em>Total</em><strong id="m-total">&ndash;</strong><span>总访问</span></li>
+    <li><em>Today</em><strong id="m-today">&ndash;</strong><span>今日</span></li>
+    <li><em>Clicks</em><strong id="m-clicks">&ndash;</strong><span>跳转</span></li>
   </ul>
 
   <section class="panel">
-    <div class="panel-head"><span>近 7 天</span><span class="muted" id="range"></span></div>
+    <div class="panel-head"><span>近七日 &middot; 单位人次</span><span class="muted" id="range"></span></div>
     <ul class="chart" id="chart" aria-label="近 7 天访问量"></ul>
   </section>
 
-  <p class="status" id="status" aria-live="polite">正在读取访问数据…</p>
-  <footer class="foot"><span id="since">&nbsp;</span></footer>
+  <p class="status" id="status" aria-live="polite">正在调阅登记簿…</p>
+
+  <footer class="foot">
+    <span><b id="since">—</b></span>
+    <span>本页为非官方粉丝页面，与扬州中学无隶属关系。</span>
+  </footer>
 </main>
 
 <script id="cfg" type="application/json" nonce="{{NONCE}}">{{CONFIG_JSON}}<\/script>
@@ -292,13 +361,13 @@ var page_default = `<!DOCTYPE html>
     try { cfg = JSON.parse(document.getElementById("cfg").textContent || "{}"); } catch (err) { cfg = {}; }
 
     var byId = function (id) { return document.getElementById(id); };
-    var nf = new Intl.NumberFormat("zh-CN");
+    var nf = new Intl.NumberFormat("en-US");
     var countUpTimers = new WeakMap();
 
     function countUp(el, target) {
       var from = Number(el.dataset.value || 0);
       var start = performance.now();
-      var duration = 900;
+      var duration = 1000;
       var previous = countUpTimers.get(el);
       if (previous) cancelAnimationFrame(previous);
       el.dataset.value = String(target);
@@ -308,7 +377,7 @@ var page_default = `<!DOCTYPE html>
       }
       (function step(now) {
         var p = Math.min(1, (now - start) / duration);
-        var eased = 1 - Math.pow(1 - p, 4);
+        var eased = 1 - Math.pow(1 - p, 5);
         el.textContent = nf.format(Math.round(from + (target - from) * eased));
         if (p < 1) countUpTimers.set(el, requestAnimationFrame(step));
       })(start);
@@ -326,14 +395,14 @@ var page_default = `<!DOCTYPE html>
       var todayKey = series.length ? series[series.length - 1].d : "";
       chart.innerHTML = series.map(function (point) {
         var ratio = max > 0 ? point.pv / max : 0;
-        var height = point.pv > 0 ? Math.max(8, Math.round(ratio * 100)) : 3;
+        var height = point.pv > 0 ? Math.max(9, Math.round(ratio * 100)) : 3;
         var parts = point.d.split("-");
         var label = Number(parts[1]) + "/" + Number(parts[2]);
         var cls = point.d === todayKey ? ' class="today"' : "";
-        return "<li" + cls + ' title="' + point.d + " · " + point.pv + ' 次访问">' +
+        return "<li" + cls + ' title="' + point.d + " · " + point.pv + ' 人次">' +
           '<span class="bar"><i data-height="' + height + '%"></i></span><em>' + label + "</em></li>";
       }).join("");
-      byId("range").textContent = series.length ? series[0].d.slice(5) + " → " + todayKey.slice(5) : "";
+      byId("range").textContent = series.length ? series[0].d.slice(5) + " — " + todayKey.slice(5) : "";
       requestAnimationFrame(function () {
         Array.prototype.forEach.call(chart.querySelectorAll("i"), function (bar) {
           bar.style.height = bar.dataset.height;
@@ -349,12 +418,12 @@ var page_default = `<!DOCTYPE html>
         countUp(byId("m-clicks"), view.clicks || 0);
         paintChart(Array.isArray(view.series) ? view.series : []);
         byId("since").textContent = view.first
-          ? "自 " + new Date(view.first).toLocaleDateString("zh-CN") + " 起记录"
-          : "尚无记录";
-        setStatus(view.counted === false ? "短时间内的重复访问已合并 · 本次未重复计数" : "本次访问已计入统计", "ok");
+          ? "登记簿启用 " + new Date(view.first).toLocaleDateString("zh-CN")
+          : "登记簿未启用";
+        setStatus(view.counted === false ? "同一访客的重复到访已合并" : "本次到访已记入登记簿", "ok");
       } else {
         paintChart([]);
-        setStatus("暂无可用统计", "warn");
+        setStatus("登记簿暂不可用", "warn");
       }
     }
 
@@ -380,7 +449,7 @@ var page_default = `<!DOCTYPE html>
           location.replace(cta.getAttribute("href"));
           return;
         }
-        setStatus(seconds + " 秒后自动前往 " + (cfg.h || ""), "warn");
+        setStatus(seconds + " 秒后前往 " + (cfg.h || ""), "warn");
       }, 1000);
     }
 
@@ -392,11 +461,11 @@ var page_default = `<!DOCTYPE html>
         })
         .then(function (view) {
           if (view) render(view);
-          else setStatus("统计读取失败，可直接点击上方按钮前往", "error");
+          else setStatus("登记簿读取失败，可直接点击上方按钮前往", "error");
           scheduleAutoRedirect();
         })
         .catch(function () {
-          setStatus("统计读取失败，可直接点击上方按钮前往", "error");
+          setStatus("登记簿读取失败，可直接点击上方按钮前往", "error");
         });
     }
 
