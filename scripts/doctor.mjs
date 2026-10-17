@@ -34,10 +34,12 @@ function readIfExists(p) {
   }
 }
 
-/** 从 wrangler.toml 的 [[routes]] 里取 pattern，以及 [vars] 里的 TARGET_URL */
+/** 从 wrangler.toml 的 [[routes]] 里取主机名（去掉 /* 与具体路径），以及 [vars] 里的 TARGET_URL */
 function readConfig() {
   const toml = readIfExists(resolve(ROOT, "wrangler.toml"));
-  const patterns = [...toml.matchAll(/^\s*pattern\s*=\s*"([^"]+)"/gm)].map((m) => m[1]);
+  const patterns = [...toml.matchAll(/^\s*pattern\s*=\s*"([^"]+)"/gm)]
+    .map((m) => m[1].split("/")[0].trim())
+    .filter((host) => host && !host.includes("*"));
   const target = /^\s*TARGET_URL\s*=\s*"([^"]+)"/m.exec(toml)?.[1] || "";
   return { patterns, target };
 }
