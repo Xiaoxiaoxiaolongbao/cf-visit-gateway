@@ -258,7 +258,8 @@ for (const host of hosts) {
       }).catch(() => null);
       const view = visit ? await visit.json().catch(() => null) : null;
       if (view) {
-        console.log(`  计数写入         : HTTP ${visit.status} | configured=${view.configured} counted=${view.counted} 总访问=${view.total} 独立访客=${view.uv}`);
+        console.log(`  计数写入         : HTTP ${visit.status} | configured=${view.configured} counted=${view.counted} 位次=${view.uv}`);
+        if ("total" in view) notes.push("线上 /v 仍在返回 total：说明跑的是旧版本（新版只下发位次）");
         if (view.configured === false) {
           console.log(`     ${warn("统计后端未绑定（COUNTER / VISITS），只跳转不计数")}`);
         }
@@ -279,7 +280,9 @@ for (const host of hosts) {
       const h = await fetch(`${base}${paths.action.h}`, { headers: { "x-admin-token": adminToken }, signal: AbortSignal.timeout(TIMEOUT_MS) }).catch(() => null);
       if (h && h.ok) {
         const info = await h.json();
-        console.log(`  GET 运维自检     : mode=${info.mode} hardened=${info.hardened} badge=${info.badge} target=${info.target}`);
+        const st = info.stats || {};
+        console.log(`  GET 运维自检     : mode=${info.mode} hardened=${info.hardened} target=${info.target}`);
+        console.log(`     完整计数       : 总访问=${st.total} 独立访客=${st.uv} 今日=${st.today} 跳转=${st.clicks}`);
         if (info.hardened === false) console.log(`     ${warn("线上用的还是默认盐（未配置 API_SECRET），隐藏路径可被推算")}`);
       } else {
         console.log(`  GET 运维自检     : HTTP ${h ? h.status : 0} ${bad("失败 —— 线上 ADMIN_TOKEN 与本机不一致，或该接口未启用")}`);

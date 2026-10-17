@@ -74,7 +74,7 @@ async function route(request, env, ctx) {
     case "v":
       return handleVisit(request, cfg, store, params);
     case "s":
-      return (await isTrusted(request, cfg)) ? json(await readStats(store, params)) : notFound();
+      return (await isTrusted(request, cfg)) ? json(ordinalView(await readStats(store, params))) : notFound();
     case "c":
       return (await isTrusted(request, cfg)) ? handleClick(store, params) : notFound();
     case "g":
@@ -204,7 +204,16 @@ async function handleVisit(request, cfg, store, params) {
   const headers = new Headers({ "cache-control": "no-store" });
   if (fresh) headers.append("set-cookie", uidCookie(uid));
 
-  return json({ ...view, counted: store.mode !== "none" && !throttled }, 200, headers);
+  return json({ ...ordinalView(view), counted: store.mode !== "none" && !throttled, isNewVisitor: view.isNewVisitor }, 200, headers);
+}
+
+/**
+ * 对外只下发「位次」相关字段（uv / first / configured）。
+ * 总访问、今日、跳转次数、每日明细一律不下发给浏览器——否则在 devtools 里就能读到。
+ * 运维要看全量请用 /<prefix>/h（需 ADMIN_TOKEN）。
+ */
+function ordinalView(view) {
+  return { configured: view.configured, uv: view.uv, first: view.first };
 }
 
 async function handleClick(store, params) {

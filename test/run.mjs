@@ -130,6 +130,14 @@ async function visit(env, cfg, headers = {}) {
   return hit(env, cfg.v, { method: "POST", headers: { "x-sig": cfg.k, ...headers } });
 }
 
+/** 运维视角：通过 /<prefix>/h（需 ADMIN_TOKEN）读取完整统计 */
+async function adminStats(env) {
+  const paths = await derivePaths(SECRET_A);
+  const res = await (await hit(env, paths.action.h, { headers: { "x-admin-token": ADMIN_A } })).res;
+  if (!res.ok) throw new Error(`health endpoint failed: ${res.status}`);
+  return res.json();
+}
+
 async function readStats(env, cfg, headers = {}) {
   const { res } = await hit(env, cfg.s, { headers: { "x-sig": cfg.k, ...headers } });
   return res.json();
@@ -280,7 +288,7 @@ test("公开面：只暴露 / 与 favicon，旧接口与常见探测路径一律
 });
 
 test("闭环：页面 → 隐藏路径 → 计数 + Cookie 去重", async () => {
-  const env = makeEnv({ COUNTER: mockDO() });
+  const env = makeEnv({ COUNTER: mockDO(), ADMIN_TOKEN: ADMIN_A });
   const site = await openSite(env);
 
   assert.ok(site.cfg.v.startsWith(`/${(await derivePaths(SECRET_A)).prefix}/`), "页面里的路径必须来自密钥派生");
@@ -289,10 +297,12 @@ test("闭环：页面 → 隐藏路径 → 计数 + Cookie 去重", async () => 
   const first = await visit(env, site.cfg);
   assert.equal(first.res.status, 200);
   const v1 = await first.res.json();
-  assert.equal(v1.total, 1);
   assert.equal(v1.uv, 1);
   assert.equal(v1.counted, true);
-  assert.equal(v1.series.length, 7);
+  // 对外只给位次：其余计数不得下发到浏览器
+  for (const hidden of ["total", "today", "clicks", "series", "last", "todayKey"]) {
+    assert.equal(hidden in v1, false, `响应不应包含 ${hidden}`);
+  }
 
   const setCookie = first.res.headers.get("set-cookie");
   assert.match(setCookie, /^_vid=[A-Za-z0-9_-]{22}/);
@@ -303,14 +313,19 @@ test("闭环：页面 → 隐藏路径 → 计数 + Cookie 去重", async () => 
   const cookie = setCookie.split(";")[0];
   const second = await visit(env, site.cfg, { cookie });
   const v2 = await second.res.json();
-  assert.equal(v2.total, 2, "同一访客再次访问应增加 PV");
   assert.equal(v2.uv, 1, "同一访客不应重复增加 UV");
+  assert.equal("total" in v2, false, "第二次访问同样不暴露总量");
   assert.equal(second.res.headers.get("set-cookie"), null, "已有合法 Cookie 时不应重复下发");
 
+  // 服务端仍在完整计数：运维接口（需令牌）能看到 total / today / clicks
+  const admin = await adminStats(env);
+  assert.equal(admin.stats.total, 2, "同一访客再次访问应增加 PV");
+  assert.equal(admin.stats.today, 2);
+  assert.equal(admin.stats.uv, 1);
+
   const stats = await readStats(env, site.cfg);
-  assert.equal(stats.total, 2);
   assert.equal(stats.uv, 1);
-  assert.equal(stats.today, 2);
+  assert.equal("total" in stats, false, "只读接口同样只给位次");
   assert.equal("seen" in stats, false, "对外视图不得包含访客指纹表");
 });
 
@@ -340,7 +355,7 @@ test("签名有效期：前一个时间窗仍可用，过期立即失效", async
 });
 
 test("跳转：只需不可猜前缀即可 302，且计入跳转次数", async () => {
-  const env = makeEnv({ COUNTER: mockDO() });
+  const env = makeEnv({ COUNTER: mockDO(), ADMIN_TOKEN: ADMIN_A });
   const site = await openSite(env);
   const paths = await derivePaths(SECRET_A);
 
@@ -354,8 +369,10 @@ test("跳转：只需不可猜前缀即可 302，且计入跳转次数", async (
   await bare.ctx.settle();
 
   const stats = await readStats(env, site.cfg);
-  assert.equal(stats.clicks, 1, "跳转次数应被记录");
-  assert.equal(stats.total, 0, "跳转不应污染访问量");
+  assert.equal("clicks" in stats, false, "跳转次数不对外下发");
+  const admin = await adminStats(env);
+  assert.equal(admin.stats.clicks, 1, "跳转次数应被记录");
+  assert.equal(admin.stats.total, 0, "跳转不应污染访问量");
 
   assert.equal((await hit(env, "/go")).res.status, 404, "裸 /go 已不存在");
 });
@@ -423,8 +440,8 @@ test("运维接口：清零与自检都需要令牌，且不回显令牌", async
   assert.equal(body.uv, 0);
   assert.ok(!JSON.stringify(body).includes(ADMIN_A), "响应不得回显令牌");
 
-  const after = await readStats(env, site.cfg);
-  assert.equal(after.total, 0, "清零后统计应归零");
+  const after = await adminStats(env);
+  assert.equal(after.stats.total, 0, "清零后统计应归零");
 
   const health = await hit(env, paths.action.h, { headers: { "x-admin-token": ADMIN_A } });
   const info = await health.res.json();
@@ -467,7 +484,7 @@ test("未配置 API_SECRET 时仍可用，但自检报告未加固", async () =>
 
   const first = await visit(env, site.cfg);
   assert.equal(first.res.status, 200);
-  assert.equal((await first.res.json()).total, 1);
+  assert.equal((await first.res.json()).uv, 1);
 
   const info = await (await hit(env, paths.action.h, { headers: { "x-admin-token": ADMIN_A } })).res.json();
   assert.equal(info.hardened, false, "必须如实报告未加固");
@@ -495,13 +512,15 @@ test("未绑定 COUNTER 时降级为 KV 后端（同样走隐藏路径）", asyn
   const paths = await derivePaths(SECRET_A);
 
   const a = await (await visit(env, site.cfg)).res.json();
-  assert.equal(a.total, 1);
   assert.equal(a.uv, 1);
+  assert.equal("total" in a, false, "对外只给位次");
 
   const b = await (await visit(env, site.cfg, { cookie: `_vid=${"b".repeat(22)}` })).res.json();
-  assert.equal(b.total, 2);
   assert.equal(b.uv, 2);
   assert.ok(kv.map.has("stats"), "KV 后端应落盘");
+  const stored = JSON.parse(kv.map.get("stats"));
+  assert.equal(stored.total, 2, "KV 内部仍完整记录 PV");
+  assert.equal(stored.uv, 2);
 
   const info = await (await hit(env, paths.action.h, { headers: { "x-admin-token": ADMIN_A } })).res;
   assert.equal(info.status, 404, "该环境未配置 ADMIN_TOKEN");
@@ -514,14 +533,15 @@ test("完全未绑定后端时页面可用且不显示假数据", async () => {
   const view = await (await visit(env, site.cfg)).res.json();
   assert.equal(view.configured, false);
   assert.equal(view.counted, false);
-  assert.equal(view.total, 0);
+  assert.equal(view.uv, 0);
+  assert.equal("total" in view, false);
 
   const jump = await hit(env, site.jump);
   assert.equal(jump.res.status, 302, "统计未配置也不能影响跳转");
 });
 
 test("同 IP 高频访问不再重复计 PV（防刷新刷量）", async () => {
-  const env = makeEnv({ COUNTER: mockDO(), MIN_INTERVAL_MS: "3000" });
+  const env = makeEnv({ COUNTER: mockDO(), MIN_INTERVAL_MS: "3000", ADMIN_TOKEN: ADMIN_A });
   const site = await openSite(env);
   const ip = { "cf-connecting-ip": "203.0.113.7" };
 
@@ -529,8 +549,10 @@ test("同 IP 高频访问不再重复计 PV（防刷新刷量）", async () => {
   const second = await (await visit(env, site.cfg, ip)).res.json();
   assert.equal(first.counted, true);
   assert.equal(second.counted, false);
-  assert.equal(second.total, 1, "节流期间 PV 不应增长");
   assert.equal(second.uv, 1);
+  assert.equal("total" in second, false, "节流响应同样不暴露总量");
+  const admin = await adminStats(env);
+  assert.equal(admin.stats.total, 1, "节流期间 PV 不应增长");
 });
 
 test("静态资源：奶蛙头像按原字节提供，且页面确实引用它", async () => {
