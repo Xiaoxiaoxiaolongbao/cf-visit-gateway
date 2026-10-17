@@ -6,9 +6,15 @@
  */
 
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { register } from "node:module";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 register("./html-loader.mjs", import.meta.url);
+
+const HERE = dirname(fileURLToPath(import.meta.url));
 
 const { Counter } = await import("../src/durable.js");
 const { default: worker } = await import("../src/index.js");
@@ -525,6 +531,31 @@ test("同 IP 高频访问不再重复计 PV（防刷新刷量）", async () => {
   assert.equal(second.counted, false);
   assert.equal(second.total, 1, "节流期间 PV 不应增长");
   assert.equal(second.uv, 1);
+});
+
+test("静态资源：奶蛙头像按原字节提供，且页面确实引用它", async () => {
+  const env = makeEnv({ COUNTER: mockDO() });
+
+  const { res } = await hit(env, "/naiwa.jpg");
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get("content-type"), "image/jpeg");
+  assert.match(res.headers.get("cache-control"), /max-age=\d+/);
+
+  const served = Buffer.from(await res.arrayBuffer());
+  const onDisk = readFileSync(resolve(HERE, "../assets/naiwa.jpg"));
+  const sha = (b) => createHash("sha256").update(b).digest("hex");
+  assert.equal(served.length, onDisk.length, "响应字节数必须与仓库里的资源一致");
+  assert.equal(sha(served), sha(onDisk), "响应字节必须与仓库里的资源逐字节一致");
+  assert.ok(served.length > 5000, "头像不应该是空文件");
+
+  const site = await openSite(env);
+  assert.ok(site.html.includes('src="/naiwa.jpg"'), "页面必须引用该头像");
+  assert.ok(site.html.includes('class="naiwa-img"'), "头像必须走真实素材这一层");
+  assert.ok(site.html.includes('class="naiwa-fallback"'), "应保留加载失败时的 SVG 兜底");
+
+  // 隐藏路由纪律不能被静态资源破坏
+  assert.equal((await hit(env, "/naiwa.jpg.bak")).res.status, 404);
+  assert.equal((await hit(env, "/assets/naiwa.jpg")).res.status, 404, "资源只从固定公开路径提供");
 });
 
 /* ------------------------------------------------------------------ 运行 */

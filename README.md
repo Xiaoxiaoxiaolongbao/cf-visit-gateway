@@ -1,7 +1,7 @@
 # cf-visit-gateway
 
 > 一个 Cloudflare Worker 搞定「访客统计 + 跳转网关」：打开页面就计数，点一下就去 `www.yzzx.org`。
-> 对外只暴露 `/` 和 `/favicon.svg`，所有接口都藏在**密钥派生的不可猜路径**下，且客户端**拿不到任何密钥**。
+> 对外只暴露 `/`、`/favicon.svg`、`/naiwa.jpg` 三个公开资源，所有接口都藏在**密钥派生的不可猜路径**下，且客户端**拿不到任何密钥**。
 
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![Runtime](https://img.shields.io/badge/runtime-Cloudflare%20Workers-f38020)
@@ -21,7 +21,7 @@
        点击「立即前往」──GET /<prefix>/g ──► 计入跳转次数 ──302──► https://www.yzzx.org
 ```
 
-除 `/` 与 `/favicon.svg` 外，**其余一切路径都返回完全相同的空 404**：没有 `/api/*`、没有 `/healthz`、没有 `/badge.svg`、没有 `/go`。
+除 `/` 与两个静态资源（`/favicon.svg`、`/naiwa.jpg`）外，**其余一切路径都返回完全相同的空 404**：没有 `/api/*`、没有 `/healthz`、没有 `/badge.svg`、没有 `/go`。
 
 ## 特性
 
@@ -111,7 +111,8 @@ npm run build:single
 | 路径 | 方法 | 鉴权 | 说明 |
 | --- | --- | --- | --- |
 | `/` | GET | 公开 | 统计页，唯一入口 |
-| `/favicon.svg` | GET | 公开 | 站点图标 |
+| /favicon.svg | GET | 公开 | 站点图标 |
+| `/naiwa.jpg` | GET | 公开 | 首页顶部的圆形奶蛙头像（384×384 JPEG，15.9 KB，缓存 1 天） |
 | `/{prefix}/g` | GET | 仅前缀 | 302 到目标站并计入跳转次数；**这是唯一可对外分享的隐藏路径** |
 | `/{prefix}/v` | POST | 前缀 + 签名 | 记录一次访问 |
 | `/{prefix}/s` | GET | 前缀 + 签名 | 读取统计 |
@@ -235,6 +236,14 @@ npm run audit
 
 可加料：`VG_AUDIT_SECRETS="额外要搜的值" npm run audit`。
 
+## 首页头像素材
+
+`assets/naiwa.jpg` 是首页顶部那个 190px 圆形头像，384×384、约 16 KB，由 Worker 从固定公开路径 `/naiwa.jpg` 按原字节提供（`Cache-Control: max-age=86400`），不在客户端产生任何外链请求。
+
+- 素材来源：社区素材仓库 [Nailong-Studio/wallpaper](https://github.com/Nailong-Studio/wallpaper)（MIT）里的 `4k/thumbs/奶蛙-4K-抱头震惊-02.jpg`，裁剪依据是可量化指标而非肉眼——该图在这批候选里主体最居中（深色轮廓质心相对画面中心仅偏 2.3% / 4.9%），圆形裁切最不容易切到本体。
+- 奶蛙是官方角色「奶龙」的民间衍生形象。仓库代码是 MIT，但角色美术的可用性需你自行确认；对外公开使用前请自行判断授权。
+- 想换成你自己的图：直接把图片覆盖到 `assets/naiwa.jpg`（建议正方形，≥384×384），然后 `npm run deploy`。页面里还留了一层内联 SVG 兜底，图片加载失败时不会出现破图。
+- 想换姿势：`Nailong-Studio/wallpaper` 里还有 5 张 4K 姿势（捶头大笑 / 抱头震惊 / 叉腰指点 / 托腮沉思 / 张臂平衡），说一声我按同一套指标重新裁一张。
 ## 数据与隐私
 
 Durable Object 里只有一个 JSON 记录：
@@ -258,7 +267,7 @@ Workers Free 每天 10 万次请求；Durable Objects 已向 Free 计划开放�
 
 ```bash
 npm run dev            # 本地 workerd，含真实 SQLite 版 Durable Object
-npm test               # 21 个零依赖用例
+npm test               # 22 个零依赖用例
 npm run audit          # 密钥泄露自检
 npm run paths          # 打印隐藏路由表与 curl 命令
 npm run check          # wrangler 干跑构建（校验配置与打包）
@@ -277,6 +286,8 @@ cp .dev.vars.example .dev.vars     # 然后填入两个随机串
 
 ```
 .
+├── assets
+│   └── naiwa.jpg     首页头像素材（社区素材仓库 Nailong-Studio/wallpaper 的奶蛙-4K-抱头震惊-02）
 ├── src
 │   ├── index.js      Worker 入口：路由分发、隐藏路径匹配、鉴权、渲染、404 折叠
 │   ├── secret.js     密钥派生：隐藏前缀、时间窗签名、定长比较、随机串
@@ -292,8 +303,8 @@ cp .dev.vars.example .dev.vars     # 然后填入两个随机串
 │   ├── doctor.mjs         部署体检：DNS/HTTP/页面/计数逐层归因
 │   └── paths.mjs          本地推导隐藏路由表
 ├── test
-│   ├── run.mjs       21 个用例：状态机 + DO + 隐藏路由 + 鉴权 + 不可区分性 + 密钥不泄露
-│   └── html-loader.mjs  让 Node 能 import '.html'（对齐 wrangler 的 Text 规则）
+│   ├── run.mjs       22 个用例：状态机 + DO + 隐藏路由 + 鉴权 + 不可区分性 + 密钥不泄露 + 静态资源
+│   └── html-loader.mjs  让 Node 能 import '.html'（Text 规则）与 '.jpg'（Data 规则）
 ├── wrangler.toml     部署配置、自定义域名 routes、变量、DO 绑定与迁移（不含任何密钥）
 ├── .github/workflows/deploy.yml   测试 + 审计 + 部署
 ├── .dev.vars.example  本地密钥模板（真实值写在 .dev.vars，已被忽略）

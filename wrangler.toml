@@ -66,11 +66,16 @@ new_sqlite_classes = ["Counter"]
 # id = "REPLACE_WITH_KV_NAMESPACE_ID"
 
 # ---------------------------------------------------------------------------
-# 把 .html 作为文本模块打包，Worker 内 import 即可拿到字符串
+# 静态资源：.html 作为文本模块、.jpg 作为二进制模块打包，Worker 内 import 即可使用
 # ---------------------------------------------------------------------------
 [[rules]]
 type = "Text"
 globs = ["**/*.html"]
+fallthrough = true
+
+[[rules]]
+type = "Data"
+globs = ["**/*.jpg"]
 fallthrough = true
 
 [observability]
