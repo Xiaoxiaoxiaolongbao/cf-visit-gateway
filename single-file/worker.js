@@ -28,372 +28,339 @@ var __toBinary = /* @__PURE__ */ (() => {
 })();
 
 // src/page.html
-var page_default = `<!DOCTYPE html>\r
-<html lang="zh-CN">\r
-<head>\r
-<meta charset="utf-8">\r
-<meta name="viewport" content="width=device-width, initial-scale=1">\r
-<meta name="color-scheme" content="dark">\r
-<meta name="robots" content="noindex, nofollow">\r
-<meta name="referrer" content="no-referrer">\r
-<title>{{TITLE}}</title>\r
-<link rel="icon" href="/favicon.svg" type="image/svg+xml">\r
-<style nonce="{{NONCE}}">\r
-  :root {\r
-    --paper: #f5f5f7;\r
-    --ink: #8a8a8f;\r
-    --ink-soft: #63636a;\r
-    --hair: rgba(255, 255, 255, .085);\r
-    --hair-strong: rgba(255, 255, 255, .16);\r
-    --black: #050506;\r
-    --ease: cubic-bezier(.16, 1, .3, 1);\r
-    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;\r
-  }\r
-\r
-  *, *::before, *::after { box-sizing: border-box; }\r
-  html { -webkit-text-size-adjust: 100%; }\r
-  ::selection { background: rgba(245, 245, 247, .18); color: #fff; }\r
-\r
-  body {\r
-    margin: 0; min-height: 100svh; background: var(--black); color: var(--paper);\r
-    display: flex; align-items: center; justify-content: center;\r
-    padding: 40px 24px 36px; overflow-x: hidden;\r
-    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",\r
-                 "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif;\r
-    font-size: 16px; line-height: 1.5; -webkit-font-smoothing: antialiased;\r
-    -webkit-tap-highlight-color: transparent; text-rendering: optimizeLegibility;\r
-  }\r
-\r
-  /* 单一侧光：左上偏心，避免对称的「打光感」；用极慢的漂移代替循环动画的廉价感 */\r
-  body::before {\r
-    content: ""; position: fixed; left: 50%; top: -18vh; width: 120vw; height: 96vh;\r
-    transform: translateX(-50%); pointer-events: none; z-index: 0;\r
-    background:\r
-      radial-gradient(38% 34% at 42% 12%, rgba(255, 255, 255, .13), transparent 68%),\r
-      radial-gradient(60% 42% at 56% 0%, rgba(190, 205, 255, .07), transparent 72%);\r
-    animation: drift 26s ease-in-out infinite alternate;\r
-  }\r
-  @keyframes drift {\r
-    from { transform: translateX(-51%) translateY(-1.5%); }\r
-    to { transform: translateX(-49%) translateY(1.5%); }\r
-  }\r
-\r
-  /* 纸感颗粒：消除大面积渐变的色带，让黑看起来有材质而不是纯色块 */\r
-  body::after {\r
-    content: ""; position: fixed; inset: 0; z-index: 3; pointer-events: none; opacity: .032;\r
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");\r
-  }\r
-\r
-  main { position: relative; z-index: 1; width: min(620px, 100%); text-align: center; }\r
-\r
-  /* 顶部分隔细线：两端渐隐，像印刷品的裁切边 */\r
-  .seam {\r
-    height: 1px; width: 100%; margin: 0 0 34px;\r
-    background: linear-gradient(90deg, transparent, var(--hair-strong) 22%, var(--hair-strong) 78%, transparent);\r
-    animation: reveal 1.1s var(--ease) both;\r
-  }\r
-\r
-  .kicker {\r
-    margin: 0 0 30px; font-family: var(--mono); font-size: 10.5px; font-weight: 400;\r
-    letter-spacing: .22em; text-transform: uppercase; color: var(--ink-soft);\r
-    animation: reveal 1.1s .06s var(--ease) both;\r
-  }\r
-\r
-  /* 展陈主体：细描边圆框 + 一圈极窄的镜面高光弧 */\r
-  .exhibit { position: relative; width: min(300px, 56vw, 34vh); margin: 0 auto; animation: reveal 1.3s .1s var(--ease) both; }\r
-  .frame {\r
-    position: relative; aspect-ratio: 1 / 1; border-radius: 50%; overflow: hidden;\r
-    box-shadow: 0 0 0 1px var(--hair-strong);\r
-  }\r
-  .frame .naiwa-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; }\r
-  .frame .naiwa-fallback { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; }\r
-  /* 镜面高光：只占左上约 1/4 的一层柔光，不做全屏 bloom */\r
-  .frame::after {\r
-    content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none; mix-blend-mode: screen;\r
-    background: radial-gradient(58% 46% at 26% 12%, rgba(255, 255, 255, .20), transparent 62%);\r
-  }\r
-  /* 22 秒一轮、5% 透明度的掠过光，慢到几乎察觉不到 */\r
-  .frame::before {\r
-    content: ""; position: absolute; inset: -35% -130%; z-index: 3; pointer-events: none;\r
-    background: linear-gradient(104deg, transparent 44%, rgba(255, 255, 255, .05) 50%, transparent 56%);\r
-    animation: pass 22s cubic-bezier(.4, 0, .2, 1) infinite;\r
-  }\r
-  @keyframes pass {\r
-    0%, 34% { transform: translateX(-52%); }\r
-    62%, 100% { transform: translateX(52%); }\r
-  }\r
-\r
-  /* 展签：把吐槽排成博物馆标签的样子，这是本页唯一的玩笑装置 */\r
-  .plate {\r
-    margin: 22px 0 0; padding: 0 0 20px;\r
-    font-family: var(--mono); font-size: 10.5px; line-height: 1.9;\r
-    letter-spacing: .1em; color: var(--ink-soft); text-transform: none;\r
-  }\r
-  .plate b { display: block; font-weight: 500; color: var(--ink); letter-spacing: .12em; }\r
-  .plate span { display: block; }\r
-\r
-  .headline {\r
-    margin: 34px 0 0; font-size: 15px; font-weight: 400; letter-spacing: .02em; color: var(--ink);\r
-    animation: reveal 1.1s .2s var(--ease) both;\r
-  }\r
-  .headline .num {\r
-    display: block; margin: 6px 0 2px;\r
-    font-size: clamp(72px, 14vw, 108px); font-weight: 500; letter-spacing: -.055em;\r
-    line-height: 1; color: var(--paper); font-variant-numeric: tabular-nums;\r
-    font-feature-settings: "tnum" 1;\r
-  }\r
-  .serial {\r
-    margin: 18px 0 0; font-family: var(--mono); font-size: 10px; letter-spacing: .24em;\r
-    text-transform: uppercase; color: var(--ink-soft);\r
-    animation: reveal 1.1s .26s var(--ease) both;\r
-  }\r
-  .serial::before, .serial::after { content: "—"; margin: 0 10px; color: var(--hair-strong); }\r
-\r
-  .cta-wrap { margin: 38px 0 0; animation: reveal 1.1s .32s var(--ease) both; }\r
-  .cta {\r
-    display: inline-flex; align-items: center; gap: 10px;\r
-    padding: 13px 28px; border-radius: 980px; border: 0;\r
-    background: var(--paper); color: #0a0a0c; text-decoration: none;\r
-    font-size: 15px; font-weight: 500; letter-spacing: .01em;\r
-    transition: background-color .25s ease, transform .25s var(--ease);\r
-  }\r
-  .cta:hover { background: #ffffff; }\r
-  .cta:active { transform: scale(.988); }\r
-  .cta:focus-visible { outline: 2px solid var(--hair-strong); outline-offset: 4px; }\r
-  .cta svg { width: 13px; height: 13px; }\r
-  .dest {\r
-    margin: 16px 0 0; font-family: var(--mono); font-size: 10px; letter-spacing: .2em;\r
-    text-transform: uppercase; color: var(--ink-soft);\r
-  }\r
-\r
-  .status {\r
-    margin: 32px 0 0; min-height: 17px; font-size: 11.5px; letter-spacing: .03em; color: var(--ink-soft);\r
-    animation: reveal 1.1s .52s var(--ease) both;\r
-  }\r
-  .status[data-state="ok"] { color: var(--ink); }\r
-  .status[data-state="warn"] { color: #d8bb62; }\r
-  .status[data-state="error"] { color: #d98b86; }\r
-\r
-  .foot {\r
-    margin: 20px 0 0; padding-top: 18px; border-top: 1px solid var(--hair);\r
-    font-size: 10.5px; line-height: 1.9; color: var(--ink-soft); letter-spacing: .03em;\r
-    animation: reveal 1.1s .58s var(--ease) both;\r
-  }\r
-  .foot b { font-weight: 400; color: var(--ink); font-family: var(--mono); letter-spacing: .1em; }\r
-  .foot span { display: block; }\r
-\r
-  @keyframes reveal {\r
-    from { opacity: 0; transform: translateY(10px); filter: blur(5px); }\r
-    to { opacity: 1; transform: none; filter: none; }\r
-  }\r
-\r
-  /* 矮屏：压缩纵向节奏，保证主按钮始终留在首屏 */\r
-  @media (max-height: 880px) {\r
-    .seam { margin-bottom: 22px; }\r
-    .kicker { margin-bottom: 18px; }\r
-    .exhibit { width: min(250px, 46vw, 29vh); }\r
-    .plate { margin-top: 16px; padding-bottom: 12px; font-size: 10px; line-height: 1.7; }\r
-    .plate .detail { display: none; }\r
-    .headline { margin-top: 22px; }\r
-    .headline .num { font-size: clamp(54px, 9.4vh, 86px); margin: 4px 0 0; }\r
-    .serial { display: none; }\r
-    .cta-wrap { margin-top: 26px; }\r
-    .status { margin-top: 24px; }\r
-    .foot { margin-top: 16px; padding-top: 14px; }\r
-  }\r
-  @media (max-width: 520px) {\r
-    body { padding: 32px 20px 28px; }\r
-    .seam { margin-bottom: 26px; }\r
-    .kicker { margin-bottom: 24px; letter-spacing: .16em; }\r
-    .exhibit { width: min(232px, 60vw, 30vh); }\r
-    .plate { margin-top: 18px; padding-bottom: 16px; }\r
-    .headline { margin-top: 26px; }\r
-    .cta-wrap { margin-top: 30px; }\r
-    .foot { font-size: 10px; }\r
-  }\r
-\r
-  @media (prefers-reduced-motion: reduce) {\r
-    *, *::before, *::after {\r
-      animation-duration: .001ms !important;\r
-      animation-delay: 0ms !important;\r
-      transition-duration: .001ms !important;\r
-    }\r
-  }\r
-</style>\r
-</head>\r
-<body>\r
-<main>\r
-  <div class="seam"></div>\r
-  <p class="kicker">Naiwa Middle School &middot; Jiangsu &middot; Est. 2026</p>\r
-\r
-  <!-- 展陈主体：真实奶蛙素材（社区素材仓库 Nailong-Studio/wallpaper 的 4K-抱头震惊-02，见 README）\r
-       下层内联 SVG 仅作加载失败兜底，不参与正常显示 -->\r
-  <div class="exhibit">\r
-    <div class="frame">\r
-      <img class="naiwa-img" src="/naiwa.jpg" alt="奶蛙" width="512" height="512" decoding="async" fetchpriority="high">\r
-      <svg class="naiwa-fallback" viewBox="0 0 200 200" aria-hidden="true">\r
-        <defs>\r
-          <radialGradient id="naiwaBg" cx="50%" cy="34%" r="78%">\r
-            <stop offset="0" stop-color="#1b2540"/>\r
-            <stop offset="100%" stop-color="#0a1020"/>\r
-          </radialGradient>\r
-          <radialGradient id="naiwaSkin" cx="38%" cy="26%" r="86%">\r
-            <stop offset="0" stop-color="#e6f8ec"/>\r
-            <stop offset="46%" stop-color="#a9e7bd"/>\r
-            <stop offset="100%" stop-color="#57b881"/>\r
-          </radialGradient>\r
-        </defs>\r
-        <circle cx="100" cy="100" r="100" fill="url(#naiwaBg)"/>\r
-        <circle cx="78" cy="52" r="17" fill="#ffffff" opacity=".93"/>\r
-        <circle cx="101" cy="41" r="23" fill="#ffffff"/>\r
-        <circle cx="125" cy="53" r="15" fill="#ffffff" opacity=".90"/>\r
-        <ellipse cx="100" cy="120" rx="61" ry="53" fill="url(#naiwaSkin)"/>\r
-        <circle cx="64" cy="78" r="26" fill="#f7fffb"/>\r
-        <circle cx="136" cy="78" r="26" fill="#f7fffb"/>\r
-        <circle cx="66" cy="80" r="12" fill="#17281f"/>\r
-        <circle cx="134" cy="80" r="12" fill="#17281f"/>\r
-        <circle cx="61" cy="74" r="4.4" fill="#ffffff"/>\r
-        <circle cx="129" cy="74" r="4.4" fill="#ffffff"/>\r
-        <circle cx="90" cy="124" r="3.2" fill="#3c6b52" opacity=".65"/>\r
-        <circle cx="110" cy="124" r="3.2" fill="#3c6b52" opacity=".65"/>\r
-        <path d="M76 142 q24 22 48 0" fill="none" stroke="#2f5d43" stroke-width="5" stroke-linecap="round"/>\r
-        <ellipse cx="46" cy="146" rx="14" ry="9" fill="#ff9db1" opacity=".45"/>\r
-        <ellipse cx="154" cy="146" rx="14" ry="9" fill="#ff9db1" opacity=".45"/>\r
-      </svg>\r
-    </div>\r
-  </div>\r
-\r
-  <!-- 展签：本页唯一的玩笑装置，写成博物馆标签的格式 -->\r
-  <p class="plate">\r
-    <b>奶蛙 &middot; 叉腰指点 &middot; № 03</b>\r
-    <span class="detail">态度：胸有成竹 / 材质：奶 / 来源：民间</span>\r
-    <span class="detail">状态：常设展 &middot; 无需门票</span>\r
-  </p>\r
-\r
-  <p class="headline">\r
-    你是第\r
-    <span class="num" id="uv" aria-live="polite">&ndash;</span>\r
-    位来到该网站的访客\r
-  </p>\r
-\r
-  <p class="serial">Visitor Record</p>\r
-\r
-  <div class="cta-wrap">\r
-    <a class="cta" id="cta" href="{{JUMP}}">前往扬州中学\r
-      <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M13 6l6 6-6 6"/></svg>\r
-    </a>\r
-    <p class="dest">{{HOST}}</p>\r
-  </div>\r
-\r
-\r
-  <p class="status" id="status" aria-live="polite">正在调阅登记簿…</p>\r
-\r
-  <footer class="foot">\r
-    <span><b id="since">—</b></span>\r
-    <span>本页为非官方粉丝页面，与扬州中学无隶属关系。</span>\r
-  </footer>\r
-</main>\r
-\r
-<script id="cfg" type="application/json" nonce="{{NONCE}}">{{CONFIG_JSON}}<\/script>\r
-<script nonce="{{NONCE}}">\r
-  (function () {\r
-    "use strict";\r
-\r
-    var cfg = {};\r
-    try { cfg = JSON.parse(document.getElementById("cfg").textContent || "{}"); } catch (err) { cfg = {}; }\r
-\r
-    var byId = function (id) { return document.getElementById(id); };\r
-    var nf = new Intl.NumberFormat("en-US");\r
-    var countUpTimers = new WeakMap();\r
-\r
-    function countUp(el, target) {\r
-      var from = Number(el.dataset.value || 0);\r
-      var start = performance.now();\r
-      var duration = 1000;\r
-      var previous = countUpTimers.get(el);\r
-      if (previous) cancelAnimationFrame(previous);\r
-      el.dataset.value = String(target);\r
-      if (from === target || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {\r
-        el.textContent = nf.format(target);\r
-        return;\r
-      }\r
-      (function step(now) {\r
-        var p = Math.min(1, (now - start) / duration);\r
-        var eased = 1 - Math.pow(1 - p, 5);\r
-        el.textContent = nf.format(Math.round(from + (target - from) * eased));\r
-        if (p < 1) countUpTimers.set(el, requestAnimationFrame(step));\r
-      })(start);\r
-    }\r
-\r
-    function setStatus(message, state) {\r
-      var el = byId("status");\r
-      el.textContent = message;\r
-      if (state) el.dataset.state = state; else el.removeAttribute("data-state");\r
-    }\r
-\r
-    function render(view) {\r
-      if (view.configured !== false) {\r
-        countUp(byId("uv"), view.uv || 0);\r
-        byId("since").textContent = view.first\r
-          ? "登记簿启用 " + new Date(view.first).toLocaleDateString("zh-CN")\r
-          : "登记簿未启用";\r
-        setStatus(view.counted === false ? "同一访客的重复到访已合并" : "本次到访已记入登记簿", "ok");\r
-      } else {\r
-        setStatus("登记簿暂不可用", "warn");\r
-      }\r
-    }\r
-\r
-    function request(path, method) {\r
-      return fetch(path, {\r
-        method: method || "POST",\r
-        headers: cfg.k ? { "x-sig": cfg.k } : {},\r
-        body: method === "GET" ? undefined : "{}",\r
-        credentials: "same-origin",\r
-        cache: "no-store"\r
-      });\r
-    }\r
-\r
-    function scheduleAutoRedirect() {\r
-      var seconds = Number(cfg.a || 0);\r
-      if (!seconds) return;\r
-      var cta = byId("cta");\r
-      cta.addEventListener("click", function () { seconds = 0; }, { once: true });\r
-      var timer = setInterval(function () {\r
-        seconds -= 1;\r
-        if (seconds <= 0) {\r
-          clearInterval(timer);\r
-          location.replace(cta.getAttribute("href"));\r
-          return;\r
-        }\r
-        setStatus(seconds + " 秒后前往 " + (cfg.h || ""), "warn");\r
-      }, 1000);\r
-    }\r
-\r
-    function boot() {\r
-      request(cfg.v, "POST")\r
-        .then(function (res) {\r
-          if (res.ok) return res.json();\r
-          return request(cfg.s, "GET").then(function (fallback) { return fallback.ok ? fallback.json() : null; });\r
-        })\r
-        .then(function (view) {\r
-          if (view) render(view);\r
-          else setStatus("登记簿读取失败，可直接点击上方按钮前往", "error");\r
-          scheduleAutoRedirect();\r
-        })\r
-        .catch(function () {\r
-          setStatus("登记簿读取失败，可直接点击上方按钮前往", "error");\r
-        });\r
-    }\r
-\r
-    byId("cta").addEventListener("click", function () {\r
-      setStatus("正在前往 " + (cfg.h || "") + " …");\r
-    });\r
-\r
-    boot();\r
-  })();\r
-<\/script>\r
-</body>\r
-</html>\r
+var page_default = `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>{{TITLE}}</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<style nonce="{{NONCE}}">
+  :root {
+    --paper: #f5f5f7;
+    --ink: #8a8a8f;
+    --ink-soft: #63636a;
+    --hair: rgba(255, 255, 255, .085);
+    --hair-strong: rgba(255, 255, 255, .16);
+    --black: #050506;
+    --ease: cubic-bezier(.16, 1, .3, 1);
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  ::selection { background: rgba(245, 245, 247, .18); color: #fff; }
+
+  body {
+    margin: 0; min-height: 100svh; background: var(--black); color: var(--paper);
+    display: flex; align-items: center; justify-content: center;
+    padding: 40px 24px 36px; overflow-x: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
+                 "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif;
+    font-size: 16px; line-height: 1.5; -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent; text-rendering: optimizeLegibility;
+  }
+
+  /* 单一侧光：左上偏心，避免对称的「打光感」；用极慢的漂移代替循环动画的廉价感 */
+  body::before {
+    content: ""; position: fixed; left: 50%; top: -18vh; width: 120vw; height: 96vh;
+    transform: translateX(-50%); pointer-events: none; z-index: 0;
+    background:
+      radial-gradient(38% 34% at 42% 12%, rgba(255, 255, 255, .13), transparent 68%),
+      radial-gradient(60% 42% at 56% 0%, rgba(190, 205, 255, .07), transparent 72%);
+    animation: drift 26s ease-in-out infinite alternate;
+  }
+  @keyframes drift {
+    from { transform: translateX(-51%) translateY(-1.5%); }
+    to { transform: translateX(-49%) translateY(1.5%); }
+  }
+
+  /* 纸感颗粒：消除大面积渐变的色带，让黑看起来有材质而不是纯色块 */
+  body::after {
+    content: ""; position: fixed; inset: 0; z-index: 3; pointer-events: none; opacity: .032;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  main { position: relative; z-index: 1; width: min(620px, 100%); text-align: center; }
+
+  /* 顶部分隔细线：两端渐隐，像印刷品的裁切边 */
+  .seam {
+    height: 1px; width: 100%; margin: 0 0 34px;
+    background: linear-gradient(90deg, transparent, var(--hair-strong) 22%, var(--hair-strong) 78%, transparent);
+    animation: reveal 1.1s var(--ease) both;
+  }
+
+  .kicker {
+    margin: 0 0 30px; font-family: var(--mono); font-size: 10.5px; font-weight: 400;
+    letter-spacing: .22em; text-transform: uppercase; color: var(--ink-soft);
+    animation: reveal 1.1s .06s var(--ease) both;
+  }
+
+  /* 展陈主体：细描边圆框 + 一圈极窄的镜面高光弧 */
+  .exhibit { position: relative; width: min(300px, 56vw, 34vh); margin: 0 auto; animation: reveal 1.3s .1s var(--ease) both; }
+  .frame {
+    position: relative; aspect-ratio: 1 / 1; border-radius: 50%; overflow: hidden;
+    box-shadow: 0 0 0 1px var(--hair-strong);
+  }
+  .frame .naiwa-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; }
+  .frame .naiwa-fallback { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; }
+  /* 镜面高光：只占左上约 1/4 的一层柔光，不做全屏 bloom */
+  .frame::after {
+    content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none; mix-blend-mode: screen;
+    background: radial-gradient(58% 46% at 26% 12%, rgba(255, 255, 255, .20), transparent 62%);
+  }
+  /* 22 秒一轮、5% 透明度的掠过光，慢到几乎察觉不到 */
+  .frame::before {
+    content: ""; position: absolute; inset: -35% -130%; z-index: 3; pointer-events: none;
+    background: linear-gradient(104deg, transparent 44%, rgba(255, 255, 255, .05) 50%, transparent 56%);
+    animation: pass 22s cubic-bezier(.4, 0, .2, 1) infinite;
+  }
+  @keyframes pass {
+    0%, 34% { transform: translateX(-52%); }
+    62%, 100% { transform: translateX(52%); }
+  }
+
+  /* 展签：把吐槽排成博物馆标签的样子，这是本页唯一的玩笑装置 */
+  .plate {
+    margin: 22px 0 0; padding: 0 0 20px;
+    font-family: var(--mono); font-size: 10.5px; line-height: 1.9;
+    letter-spacing: .1em; color: var(--ink-soft); text-transform: none;
+  }
+  .plate b { display: block; font-weight: 500; color: var(--ink); letter-spacing: .12em; }
+  .plate span { display: block; }
+
+  .headline {
+    margin: 34px 0 0; font-size: 15px; font-weight: 400; letter-spacing: .02em; color: var(--ink);
+    animation: reveal 1.1s .2s var(--ease) both;
+  }
+  .headline .num {
+    display: block; margin: 6px 0 2px;
+    font-size: clamp(72px, 14vw, 108px); font-weight: 500; letter-spacing: -.055em;
+    line-height: 1; color: var(--paper); font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+  }
+  .serial {
+    margin: 18px 0 0; font-family: var(--mono); font-size: 10px; letter-spacing: .24em;
+    text-transform: uppercase; color: var(--ink-soft);
+    animation: reveal 1.1s .26s var(--ease) both;
+  }
+  .serial::before, .serial::after { content: "—"; margin: 0 10px; color: var(--hair-strong); }
+
+  .cta-wrap { margin: 38px 0 0; animation: reveal 1.1s .32s var(--ease) both; }
+  .cta {
+    display: inline-flex; align-items: center; gap: 10px;
+    padding: 13px 28px; border-radius: 980px; border: 0;
+    background: var(--paper); color: #0a0a0c; text-decoration: none;
+    font-size: 15px; font-weight: 500; letter-spacing: .01em;
+    transition: background-color .25s ease, transform .25s var(--ease);
+  }
+  .cta:hover { background: #ffffff; }
+  .cta:active { transform: scale(.988); }
+  .cta:focus-visible { outline: 2px solid var(--hair-strong); outline-offset: 4px; }
+  .cta svg { width: 13px; height: 13px; }
+  .dest {
+    margin: 16px 0 0; font-family: var(--mono); font-size: 10px; letter-spacing: .2em;
+    text-transform: uppercase; color: var(--ink-soft);
+  }
+
+  @keyframes reveal {
+    from { opacity: 0; transform: translateY(10px); filter: blur(5px); }
+    to { opacity: 1; transform: none; filter: none; }
+  }
+
+  /* 矮屏：压缩纵向节奏，保证主按钮始终留在首屏 */
+  @media (max-height: 880px) {
+    .seam { margin-bottom: 22px; }
+    .kicker { margin-bottom: 18px; }
+    .exhibit { width: min(250px, 46vw, 29vh); }
+    .plate { margin-top: 16px; padding-bottom: 12px; font-size: 10px; line-height: 1.7; }
+    .plate .detail { display: none; }
+    .headline { margin-top: 22px; }
+    .headline .num { font-size: clamp(54px, 9.4vh, 86px); margin: 4px 0 0; }
+    .serial { display: none; }
+    .cta-wrap { margin-top: 26px; }
+  }
+  @media (max-width: 520px) {
+    body { padding: 32px 20px 28px; }
+    .seam { margin-bottom: 26px; }
+    .kicker { margin-bottom: 24px; letter-spacing: .16em; }
+    .exhibit { width: min(232px, 60vw, 30vh); }
+    .plate { margin-top: 18px; padding-bottom: 16px; }
+    .headline { margin-top: 26px; }
+    .cta-wrap { margin-top: 30px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: .001ms !important;
+      animation-delay: 0ms !important;
+      transition-duration: .001ms !important;
+    }
+  }
+</style>
+</head>
+<body>
+<main>
+  <div class="seam"></div>
+  <p class="kicker">Naiwa Middle School &middot; Jiangsu &middot; Est. 2026</p>
+
+  <!-- 展陈主体：真实奶蛙素材（社区素材仓库 Nailong-Studio/wallpaper 的 4K-抱头震惊-02，见 README）
+       下层内联 SVG 仅作加载失败兜底，不参与正常显示 -->
+  <div class="exhibit">
+    <div class="frame">
+      <img class="naiwa-img" src="/naiwa.jpg" alt="奶蛙" width="512" height="512" decoding="async" fetchpriority="high">
+      <svg class="naiwa-fallback" viewBox="0 0 200 200" aria-hidden="true">
+        <defs>
+          <radialGradient id="naiwaBg" cx="50%" cy="34%" r="78%">
+            <stop offset="0" stop-color="#1b2540"/>
+            <stop offset="100%" stop-color="#0a1020"/>
+          </radialGradient>
+          <radialGradient id="naiwaSkin" cx="38%" cy="26%" r="86%">
+            <stop offset="0" stop-color="#e6f8ec"/>
+            <stop offset="46%" stop-color="#a9e7bd"/>
+            <stop offset="100%" stop-color="#57b881"/>
+          </radialGradient>
+        </defs>
+        <circle cx="100" cy="100" r="100" fill="url(#naiwaBg)"/>
+        <circle cx="78" cy="52" r="17" fill="#ffffff" opacity=".93"/>
+        <circle cx="101" cy="41" r="23" fill="#ffffff"/>
+        <circle cx="125" cy="53" r="15" fill="#ffffff" opacity=".90"/>
+        <ellipse cx="100" cy="120" rx="61" ry="53" fill="url(#naiwaSkin)"/>
+        <circle cx="64" cy="78" r="26" fill="#f7fffb"/>
+        <circle cx="136" cy="78" r="26" fill="#f7fffb"/>
+        <circle cx="66" cy="80" r="12" fill="#17281f"/>
+        <circle cx="134" cy="80" r="12" fill="#17281f"/>
+        <circle cx="61" cy="74" r="4.4" fill="#ffffff"/>
+        <circle cx="129" cy="74" r="4.4" fill="#ffffff"/>
+        <circle cx="90" cy="124" r="3.2" fill="#3c6b52" opacity=".65"/>
+        <circle cx="110" cy="124" r="3.2" fill="#3c6b52" opacity=".65"/>
+        <path d="M76 142 q24 22 48 0" fill="none" stroke="#2f5d43" stroke-width="5" stroke-linecap="round"/>
+        <ellipse cx="46" cy="146" rx="14" ry="9" fill="#ff9db1" opacity=".45"/>
+        <ellipse cx="154" cy="146" rx="14" ry="9" fill="#ff9db1" opacity=".45"/>
+      </svg>
+    </div>
+  </div>
+
+  <!-- 展签：本页唯一的玩笑装置，写成博物馆标签的格式 -->
+  <p class="plate">
+    <b>奶蛙 &middot; 叉腰指点 &middot; № 03</b>
+    <span class="detail">态度：胸有成竹 / 材质：奶 / 来源：民间</span>
+    <span class="detail">状态：常设展 &middot; 无需门票</span>
+  </p>
+
+  <p class="headline">
+    你是第
+    <span class="num" id="uv" aria-live="polite">&ndash;</span>
+    位来到该网站的访客
+  </p>
+
+  <p class="serial" id="serial">Visitor Record</p>
+
+  <div class="cta-wrap">
+    <a class="cta" id="cta" href="{{JUMP}}"><span id="cta-label">前往扬州中学</span>
+      <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M13 6l6 6-6 6"/></svg>
+    </a>
+    <p class="dest">{{HOST}}</p>
+  </div>
+</main>
+
+<script id="cfg" type="application/json" nonce="{{NONCE}}">{{CONFIG_JSON}}<\/script>
+<script nonce="{{NONCE}}">
+  (function () {
+    "use strict";
+
+    var cfg = {};
+    try { cfg = JSON.parse(document.getElementById("cfg").textContent || "{}"); } catch (err) { cfg = {}; }
+
+    var byId = function (id) { return document.getElementById(id); };
+    var nf = new Intl.NumberFormat("en-US");
+    var countUpTimers = new WeakMap();
+
+    function countUp(el, target) {
+      var from = Number(el.dataset.value || 0);
+      var start = performance.now();
+      var duration = 1000;
+      var previous = countUpTimers.get(el);
+      if (previous) cancelAnimationFrame(previous);
+      el.dataset.value = String(target);
+      if (from === target || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        el.textContent = nf.format(target);
+        return;
+      }
+      (function step(now) {
+        var p = Math.min(1, (now - start) / duration);
+        var eased = 1 - Math.pow(1 - p, 5);
+        el.textContent = nf.format(Math.round(from + (target - from) * eased));
+        if (p < 1) countUpTimers.set(el, requestAnimationFrame(step));
+      })(start);
+    }
+
+    /* 状态行已移除：异常只静默写进等宽小字那一行，正常时保持 Visitor Record */
+    function setNote(message) {
+      var el = byId("serial");
+      if (el) el.textContent = message;
+    }
+
+    function render(view) {
+      if (view.configured !== false) {
+        countUp(byId("uv"), view.uv || 0);
+        setNote("Visitor Record");
+      } else {
+        setNote("不可用");
+      }
+    }
+
+    function request(path, method) {
+      return fetch(path, {
+        method: method || "POST",
+        headers: cfg.k ? { "x-sig": cfg.k } : {},
+        body: method === "GET" ? undefined : "{}",
+        credentials: "same-origin",
+        cache: "no-store"
+      });
+    }
+
+    function scheduleAutoRedirect() {
+      var seconds = Number(cfg.a || 0);
+      if (!seconds) return;
+      var cta = byId("cta");
+      cta.addEventListener("click", function () { seconds = 0; }, { once: true });
+      var timer = setInterval(function () {
+        seconds -= 1;
+        if (seconds <= 0) {
+          clearInterval(timer);
+          location.replace(cta.getAttribute("href"));
+          return;
+        }
+        var label = byId("cta-label");
+        if (label) label.textContent = seconds + " 秒后前往";
+      }, 1000);
+    }
+
+    function boot() {
+      request(cfg.v, "POST")
+        .then(function (res) {
+          if (res.ok) return res.json();
+          return request(cfg.s, "GET").then(function (fallback) { return fallback.ok ? fallback.json() : null; });
+        })
+        .then(function (view) {
+          if (view) render(view);
+          else setNote("读取失败");
+          scheduleAutoRedirect();
+        })
+        .catch(function () {
+          setNote("读取失败");
+        });
+    }
+
+    boot();
+  })();
+<\/script>
+</body>
+</html>
 `;
 
 // assets/naiwa.jpg
