@@ -58,29 +58,34 @@ var page_default = `<!DOCTYPE html>
   }
   @keyframes rise { from { opacity: 0; transform: translateY(14px) scale(.985); } to { opacity: 1; transform: none; } }
 
-  .pill {
-    display: inline-flex; align-items: center; gap: 8px; padding: 5px 12px; border-radius: 999px;
-    font-size: 12.5px; letter-spacing: .02em; color: #a9b4cc;
-    border: 1px solid rgba(255, 255, 255, .10); background: rgba(255, 255, 255, .04);
+  /* 顶部圆形奶蛙头像 */
+  .avatar {
+    width: 190px; height: 190px; margin: 4px auto 18px; border-radius: 50%;
+    overflow: hidden; position: relative; isolation: isolate;
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, .10),
+      0 0 0 9px rgba(255, 255, 255, .028),
+      0 26px 60px -26px rgba(52, 211, 153, .55),
+      0 0 80px -12px rgba(99, 102, 241, .40);
+    animation: float 6s ease-in-out infinite;
   }
-  .pill i { width: 7px; height: 7px; border-radius: 50%; background: #34d399; animation: pulse 2.4s ease-out infinite; }
-  @keyframes pulse {
-    0% { box-shadow: 0 0 0 0 rgba(52, 211, 153, .55); }
-    70% { box-shadow: 0 0 0 9px rgba(52, 211, 153, 0); }
-    100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0); }
+  .avatar svg { display: block; width: 100%; height: 100%; }
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-7px); }
   }
 
-  h1 { margin: 13px 0 0; font-size: 14px; font-weight: 500; letter-spacing: .01em; color: #8e99b3; }
+  h1 { margin: 0 0 16px; font-size: 13px; font-weight: 500; letter-spacing: .07em; color: #8e99b3; text-align: center; }
 
-  .hero { margin: 8px 0 0; }
-  .num {
-    font-size: 64px; line-height: 1.06; font-weight: 700; letter-spacing: -.03em;
-    font-variant-numeric: tabular-nums;
+  .hero { text-align: center; margin: 0; }
+  .visitor-line { margin: 0; font-size: 15.5px; line-height: 1.75; color: #c8d2e8; letter-spacing: .01em; }
+  .visitor-line .num {
+    display: inline-block; min-width: 1ch; padding: 0 7px; vertical-align: -5px;
+    font-size: 42px; font-weight: 700; letter-spacing: -.02em; font-variant-numeric: tabular-nums;
     background: linear-gradient(120deg, #ffffff 8%, #c7d2fe 46%, #67e8f9 92%);
     -webkit-background-clip: text; background-clip: text; color: transparent;
-    text-shadow: 0 0 60px rgba(99, 102, 241, .35);
+    text-shadow: 0 0 50px rgba(99, 102, 241, .38);
   }
-  .unit { font-size: 12.5px; letter-spacing: .05em; color: #8e99b3; margin-top: 2px; }
 
   .metrics {
     display: grid; grid-template-columns: repeat(3, 1fr); list-style: none; margin: 18px 0 0; padding: 14px 0;
@@ -131,17 +136,26 @@ var page_default = `<!DOCTYPE html>
   .cta svg { width: 22px; height: 22px; flex: none; transition: transform .18s; }
   .cta:hover svg { transform: translateX(3px); }
 
-  .status { margin: 14px 2px 0; min-height: 18px; font-size: 12px; color: #7f8aa3; }
+  .status {
+    display: flex; align-items: center; justify-content: center; gap: 7px;
+    margin: 14px 0 0; min-height: 18px; font-size: 12px; color: #7f8aa3; text-align: center;
+  }
+  .status::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #5f6a80; flex: none; }
+  .status[data-state="ok"]::before { background: #34d399; box-shadow: 0 0 8px rgba(52, 211, 153, .85); }
   .status[data-state="warn"] { color: #fcd34d; }
+  .status[data-state="warn"]::before { background: #fcd34d; }
   .status[data-state="error"] { color: #fca5a5; }
+  .status[data-state="error"]::before { background: #fca5a5; }
   .foot {
-    display: flex; justify-content: space-between; gap: 8px; margin-top: 14px; padding-top: 12px;
+    display: flex; justify-content: center; gap: 8px; margin-top: 14px; padding-top: 12px;
     border-top: 1px solid rgba(255, 255, 255, .06); font-size: 11px; color: #5f6a80;
   }
 
   @media (max-width: 400px) {
     .card { padding: 22px 18px 16px; border-radius: 22px; }
-    .num { font-size: 52px; }
+    .avatar { width: 150px; height: 150px; margin-bottom: 14px; }
+    .visitor-line { font-size: 14.5px; }
+    .visitor-line .num { font-size: 36px; }
   }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
@@ -150,12 +164,49 @@ var page_default = `<!DOCTYPE html>
 </head>
 <body>
 <main class="card">
-  <span class="pill"><i></i>访客统计</span>
+  <!-- 奶蛙头像：内联手绘 SVG，不引任何外部图片（零外链、可无限放大不失真） -->
+  <div class="avatar">
+    <svg viewBox="0 0 200 200" role="img" aria-label="奶蛙">
+      <defs>
+        <radialGradient id="naiwaBg" cx="50%" cy="34%" r="78%">
+          <stop offset="0" stop-color="#1b2540"/>
+          <stop offset="100%" stop-color="#0a1020"/>
+        </radialGradient>
+        <radialGradient id="naiwaSkin" cx="38%" cy="26%" r="86%">
+          <stop offset="0" stop-color="#e6f8ec"/>
+          <stop offset="46%" stop-color="#a9e7bd"/>
+          <stop offset="100%" stop-color="#57b881"/>
+        </radialGradient>
+      </defs>
+      <circle cx="100" cy="100" r="100" fill="url(#naiwaBg)"/>
+      <!-- 头顶奶泡 -->
+      <circle cx="78" cy="52" r="17" fill="#ffffff" opacity=".93"/>
+      <circle cx="101" cy="41" r="23" fill="#ffffff"/>
+      <circle cx="125" cy="53" r="15" fill="#ffffff" opacity=".90"/>
+      <!-- 头 -->
+      <ellipse cx="100" cy="120" rx="61" ry="53" fill="url(#naiwaSkin)"/>
+      <!-- 凸出的两只大眼 -->
+      <circle cx="64" cy="78" r="26" fill="#f7fffb"/>
+      <circle cx="136" cy="78" r="26" fill="#f7fffb"/>
+      <circle cx="66" cy="80" r="12" fill="#17281f"/>
+      <circle cx="134" cy="80" r="12" fill="#17281f"/>
+      <circle cx="61" cy="74" r="4.4" fill="#ffffff"/>
+      <circle cx="129" cy="74" r="4.4" fill="#ffffff"/>
+      <!-- 鼻孔 -->
+      <circle cx="90" cy="124" r="3.2" fill="#3c6b52" opacity=".65"/>
+      <circle cx="110" cy="124" r="3.2" fill="#3c6b52" opacity=".65"/>
+      <!-- 微笑 -->
+      <path d="M76 142 q24 22 48 0" fill="none" stroke="#2f5d43" stroke-width="5" stroke-linecap="round"/>
+      <!-- 腮红 -->
+      <ellipse cx="46" cy="146" rx="14" ry="9" fill="#ff9db1" opacity=".45"/>
+      <ellipse cx="154" cy="146" rx="14" ry="9" fill="#ff9db1" opacity=".45"/>
+    </svg>
+  </div>
+
   <h1>{{TITLE}}</h1>
 
   <section class="hero">
-    <div class="num" id="uv" aria-live="polite">&ndash;</div>
-    <div class="unit">位独立访客到访</div>
+    <p class="visitor-line">你是第 <span class="num" id="uv" aria-live="polite">&ndash;</span> 位来到该网站的访客</p>
   </section>
 
   <ul class="metrics">
@@ -170,7 +221,7 @@ var page_default = `<!DOCTYPE html>
   </section>
 
   <a class="cta" id="cta" href="{{JUMP}}">
-    <span class="cta-main"><strong>立即前往</strong><em>{{HOST}}</em></span>
+    <span class="cta-main"><strong>单击访问</strong><em>{{HOST}}</em></span>
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
   </a>
 
@@ -246,7 +297,7 @@ var page_default = `<!DOCTYPE html>
         byId("since").textContent = view.first
           ? "自 " + new Date(view.first).toLocaleDateString("zh-CN") + " 起记录"
           : "尚无记录";
-        setStatus(view.counted === false ? "短时间内的重复访问已合并 · 本次未重复计数" : "本次访问已计入统计");
+        setStatus(view.counted === false ? "短时间内的重复访问已合并 · 本次未重复计数" : "本次访问已计入统计", "ok");
       } else {
         paintChart([]);
         setStatus("暂无可用统计", "warn");
