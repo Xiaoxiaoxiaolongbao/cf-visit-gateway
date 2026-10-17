@@ -4,6 +4,11 @@ main = "src/index.js"
 compatibility_date = "2026-09-01"
 workers_dev = true
 
+# 账号里有多个 Cloudflare 账号（例如还留着 --temporary 生成的临时预览账号）时，
+# 非交互环境下 wrangler 无法自动选择，会报 "More than one account available"。
+# 这里固定绑到本项目所属账号；换成你自己的账号 ID 或删掉这一行即可（也可用环境变量 CLOUDFLARE_ACCOUNT_ID 覆盖）。
+account_id = "05389e0b486b83cef368ded14cf44c21"
+
 # ---------------------------------------------------------------------------
 # 自定义域名（这是「域名打不开」的唯一开关）
 #

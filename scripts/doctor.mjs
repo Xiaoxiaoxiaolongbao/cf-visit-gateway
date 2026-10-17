@@ -83,19 +83,29 @@ async function resolveHost(host) {
   return result;
 }
 
-/** DoH 兜底：本机 DNS 被劫持时用 HTTPS 直接问解析器 */
+/** DoH 兜底：本机 DNS 被劫持或滞后时，用 HTTPS 直接问多个公共解析器交叉验证 */
+const DOH_PROVIDERS = [
+  { name: "Cloudflare", url: (host) => `https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(host)}&type=A`, header: true },
+  { name: "Google", url: (host) => `https://dns.google/resolve?name=${encodeURIComponent(host)}&type=A`, header: false },
+  { name: "AliDNS", url: (host) => `https://dns.alidns.com/resolve?name=${encodeURIComponent(host)}&type=A`, header: false },
+  { name: "360", url: (host) => `https://doh.360.cn/resolve?name=${encodeURIComponent(host)}&type=A`, header: false },
+];
+
 async function resolveViaDoh(host) {
-  try {
-    const res = await fetch(`https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(host)}&type=A`, {
-      headers: { accept: "application/dns-json" },
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    });
-    const body = await res.json();
-    return { status: body.Status, answers: (body.Answer || []).map((a) => a.data) };
-  } catch (err) {
-    const code = err.cause?.code || err.cause?.message || err.message || "";
-    return { status: -1, answers: [], error: code };
+  const errors = [];
+  for (const provider of DOH_PROVIDERS) {
+    try {
+      const res = await fetch(provider.url(host), {
+        headers: provider.header ? { accept: "application/dns-json" } : {},
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      });
+      const body = await res.json();
+      return { provider: provider.name, status: body.Status, answers: (body.Answer || []).map((a) => a.data) };
+    } catch (err) {
+      errors.push(`${provider.name}:${err.cause?.code || err.message || "fail"}`);
+    }
   }
+  return { provider: "", status: -1, answers: [], error: errors.join(", ") };
 }
 
 async function httpGet(url, options = {}) {
@@ -150,37 +160,49 @@ for (const host of hosts) {
   if (!dnsResult.a.length && !dnsResult.aaaa.length) {
     const doh = await resolveViaDoh(host);
     if (doh.answers.length) {
-      console.log(`     DoH 兜底: ${doh.answers.join(", ")}   ${warn("本机 DNS 结果与公共解析器不一致，可能是本机 DNS 被劫持")}`);
+      console.log(`     DoH 交叉验证(${doh.provider}): ${doh.answers.join(", ")}   ${warn("本机 DNS 与公共解析器不一致，可能是本机 DNS 被劫持或负缓存")}`);
     } else if (doh.status === 3) {
-      console.log(`     DoH 兜底: NXDOMAIN（域名在公网解析中不存在）`);
+      console.log(`     DoH 交叉验证(${doh.provider}): NXDOMAIN（公网解析中该主机名不存在）`);
     } else if (doh.status === 0) {
-      console.log(`     DoH 兜底: NOERROR 但没有任何 A 记录`);
+      console.log(`     DoH 交叉验证(${doh.provider}): NOERROR，但没有任何 A 记录`);
     } else if (doh.error) {
-      console.log(`     DoH 兜底: 不可用（${doh.error}）`);
+      console.log(`     DoH 交叉验证: 全部公共解析器不可用（${doh.error}）`);
       if (/CERT|VERIFY|UNABLE_TO_VERIFY|SELF_SIGNED/i.test(String(doh.error))) {
-        notes.push("DoH 查询因本机 TLS 检查代理失败：请改用 `npm run doctor:ca`");
+        notes.push("本机存在 TLS 检查代理导致 DoH 失败：改用 `npm run doctor:ca` 可拿到更准确的判定");
       }
     }
 
-    hardFailure = true;
-    console.log(`  ${bad("域名没有指向任何 IP —— 浏览器在这一步就失败，就是「打不开」的直接原因")}`);
-    if (onCloudflareNs) {
-      console.log("     已确认：该域名的权威 NS 就是 Cloudflare，所以问题是「这个主机名没有绑定到 Worker」，不是域名没接入。");
+    // 关键防线：DNS 说没记录、但 HTTPS 能连通 —— 那多半是本机解析滞后，不是站点故障
+    const direct = await httpGet(`https://${host}/`);
+    if (direct.status === 200) {
+      console.log(`  ${warn(`本机解析无记录，但 HTTPS 直连返回 200（${direct.ms}ms）`)}`);
+      console.log("     判定：本机 DNS 结果滞后或不可信（刚绑完自定义域名时很常见），站点实际可用；下方按直连结果继续检查。");
+    } else {
+      hardFailure = true;
+      console.log(`  ${bad(`域名没有指向任何 IP，且 HTTPS 直连也失败（${direct.error || direct.status}）`)}`);
+      console.log("     含义：浏览器会在 DNS 阶段就失败，这就是「打不开」的直接原因。");
+      if (onCloudflareNs) {
+        console.log("     已确认：该域名的权威 NS 就是 Cloudflare，所以问题是「这个主机名没有绑定到 Worker」，不是域名没接入。");
+      }
+      console.log("     修法（任选其一）：");
+      console.log("       a) 让 Worker 自己接管域名：在 wrangler.toml 加");
+      console.log("            [[routes]]");
+      console.log(`            pattern = "${host}"`);
+      console.log("            custom_domain = true");
+      console.log("          然后 `npm run deploy`（会自动创建代理 A/AAAA 记录与证书）");
+      console.log("       b) 面板操作：Worker → Settings → Domains & Routes → Add custom domain");
+      console.log("     注意：如果该主机名上已存在 A/AAAA/CNAME 记录，custom domain 会创建失败，需先删掉冲突记录。");
+      if (apexish) console.log("     另注意 www 与裸域是两个不同的主机名，要分别绑定。");
+      console.log("     刚绑定完就报这个，也可能是解析尚未传播：等 1–2 分钟重跑本脚本，或换手机流量验证。");
+      continue;
     }
-    console.log("     修法（任选其一）：");
-    console.log("       a) 让 Worker 自己接管域名：在 wrangler.toml 加");
-    console.log(`            [[routes]]`);
-    console.log(`            pattern = "${host}"`);
-    console.log(`            custom_domain = true`);
-    console.log("          然后 `npm run deploy`（会自动创建代理 A/AAAA 记录与证书）");
-    console.log("       b) 面板操作：Worker → Settings → Domains & Routes → Add custom domain");
-    console.log("     注意：如果该主机名上已存在 A/AAAA/CNAME 记录，custom domain 会创建失败，需先删掉冲突记录。");
-    if (apexish) console.log("     另注意 www 与裸域是两个不同的主机名，要分别绑定。");
-    continue;
   }
 
-  const cfLike = [...dnsResult.a].every(looksCloudflare);
-  console.log(`     边缘判断: ${cfLike ? ok("解析到 Cloudflare 边缘地址段") : bad("解析到的 IP 不像 Cloudflare 边缘，可能未走 CF 代理或被劫持")}`);
+  const resolvedIps = [...dnsResult.a, ...dnsResult.aaaa];
+  if (resolvedIps.length) {
+    const cfLike = resolvedIps.every(looksCloudflare);
+    console.log(`     边缘判断: ${cfLike ? ok("解析到 Cloudflare 边缘地址段") : bad("解析到的 IP 不像 Cloudflare 边缘，可能未走 CF 代理或被劫持")}`);
+  }
 
   const base = `https://${host}`;
   const page = await httpGet(`${base}/`);

@@ -146,6 +146,7 @@ npm run doctor:ca               # 本机有 TLS 检查代理（报 UNABLE_TO_VER
 | --- | --- |
 | A/AAAA/CNAME | 主机名是否解析、是否指向 Cloudflare 边缘地址段 |
 | 权威 NS | zone 是否已托管在 Cloudflare——用于区分「域名没接入」与「主机名没绑定」 |
+| DoH 交叉验证 | 本机 DNS 可疑时，用 Cloudflare / Google / AliDNS / 360 四家 DoH 交叉核对 |
 | `GET /` | 状态码、是否真的是本项目页面、CSP 是否生效、cf-ray 是否存在 |
 | `GET /favicon.svg` | 静态资源是否被 Worker 处理 |
 | `GET 随机路径` | 必须返回**空 body 的 404**；若返回带 body 的 404 或 200，说明流量没进本项目 Worker |
@@ -153,7 +154,11 @@ npm run doctor:ca               # 本机有 TLS 检查代理（报 UNABLE_TO_VER
 | 计数写入 | 带签名 POST 后的 `configured` / `counted` / 总数 |
 | 隐藏路径（可选） | 本机能读到 `API_SECRET` 时，核对该部署的派生前缀，并提示是否仍在用默认盐 |
 
-### 实测：`heyiwei.asia` 打不开的原因
+判定纪律：DNS 查不到记录时**不会直接下结论**，而是再发一次 HTTPS 请求——直连能通就说明是本机解析滞后，报告为警告而非故障。
+
+### 实例：`heyiwei.asia` 从打不开到可用（已修复）
+
+修复前的体检结论：
 
 ```
 heyiwei.asia      A/AAAA : （无记录）  权威 NS : june / lochlan.ns.cloudflare.com  ✓ 已托管在 Cloudflare
@@ -161,23 +166,26 @@ www.heyiwei.asia  A/AAAA : （无记录）  ENOTFOUND
 结论：域名已经交给 Cloudflare 托管，但没有任何主机名绑定到 Worker —— 浏览器在 DNS 阶段就失败
 ```
 
-修法就是 `wrangler.toml` 里已经写好的这两段（裸域与 www 是两个主机名，必须各绑一次）：
+根因就是少了主机名绑定，加上 `wrangler.toml` 里那两段 `[[routes]]`（裸域与 www 是两个主机名，必须各绑一次）后重新部署，同一脚本的结论变成：
 
-```toml
-[[routes]]
-pattern = "heyiwei.asia"
-custom_domain = true
-
-[[routes]]
-pattern = "www.heyiwei.asia"
-custom_domain = true
+```
+================ heyiwei.asia ================
+     边缘判断: ✓ 解析到 Cloudflare 边缘地址段
+  GET /            : HTTP 200 | 12.7 KB | 是否本站页面 ✓ | CSP ✓
+  GET 随机路径     : HTTP 404 | body 0 字节  ✓ 符合本站特征（空 404）
+  GET 跳转路径     : HTTP 302 | → https://yzzx.org/  ✓
+  计数写入         : HTTP 200 | configured=true counted=true
+  GET 运维自检     : mode=durable hardened=true target=https://yzzx.org/
+================ 结论 ================
+  ✓ 未发现阻断性问题：域名已解析、HTTPS 可访问、流量确实进了本站 Worker。
 ```
 
 `npm run deploy` 之后 Cloudflare 会自动创建代理 A/AAAA 记录并签发证书。三种典型失败：
 
 - **报记录冲突**：该主机名上已有 A/AAAA/CNAME 记录，先删掉冲突记录，或改用面板 Worker → Settings → Domains & Routes → Add custom domain。
-- **报找不到 zone**：`heyiwei.asia` 这个 zone 不在当前 Cloudflare 账号（或 NS 尚未生效）。Worker 与域名必须在同一账号。
-- **部署成功但仍打不开**：先 `npm run doctor`，看是「解析到非 Cloudflare IP」（未开代理/被劫持）还是「404 带 body」（流量没进 Worker）。
+- **报找不到 zone**：该域名不在当前 Cloudflare 账号（或 NS 尚未生效）。Worker 与域名必须在同一账号。
+- **部署成功但刚打开没反应**：新建自定义域名后解析需要传播，且本机 DNS 可能还在用负缓存，等 1–2 分钟重跑 `npm run doctor`；脚本会优先用 HTTPS 直连交叉验证，不会把这种滞后误判成故障。
+- **部署报「More than one account available」**：账号下有多个 Cloudflare 账号（例如残留的 `--temporary` 临时预览账号）时非交互模式无法自选，已在 `wrangler.toml` 用 `account_id` 固定，换账号改这一行即可。
 
 不想用自定义域名就把这两段删掉，`workers.dev` 地址照常可用；GitHub Actions 在部署后会自动跑一次体检并在日志里输出同样的结论。
 
