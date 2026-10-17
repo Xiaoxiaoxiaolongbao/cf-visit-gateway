@@ -1,6 +1,6 @@
 # cf-visit-gateway
 
-> 一个 Cloudflare Worker 搞定「访客统计 + 跳转网关」：打开页面就计数，点一下就去 `yzzx.org`。
+> 一个 Cloudflare Worker 搞定「访客统计 + 跳转网关」：打开页面就计数，点一下就去 `www.yzzx.org`。
 > 对外只暴露 `/` 和 `/favicon.svg`，所有接口都藏在**密钥派生的不可猜路径**下，且客户端**拿不到任何密钥**。
 
 ![License](https://img.shields.io/badge/license-MIT-blue)
@@ -18,7 +18,7 @@
 访客 ──GET / ──────────────► 统计页（独立访客 / 总访问 / 今日 / 跳转次数 / 近 7 天柱状图）
                              │ 页面用「时间窗签名」POST 到 /<prefix>/v 计入一次访问
                              ▼
-       点击「立即前往」──GET /<prefix>/g ──► 计入跳转次数 ──302──► https://yzzx.org
+       点击「立即前往」──GET /<prefix>/g ──► 计入跳转次数 ──302──► https://www.yzzx.org
 ```
 
 除 `/` 与 `/favicon.svg` 外，**其余一切路径都返回完全相同的空 404**：没有 `/api/*`、没有 `/healthz`、没有 `/badge.svg`、没有 `/go`。
@@ -95,7 +95,7 @@ npm run build:single
 
 | 变量 | 默认值 | 说明 |
 | --- | --- | --- |
-| `TARGET_URL` | `https://yzzx.org` | 跳转目标。只接受 `http/https`，其它协议自动回退默认值，防止被配成 `javascript:` 之类 |
+| `TARGET_URL` | `https://www.yzzx.org` | 跳转目标。只接受 `http/https`，其它协议自动回退默认值，防止被配成 `javascript:` 之类 |
 | `SITE_TITLE` | `本站访客统计` | 页面标题 |
 | `TZ_OFFSET` | `8` | 统计「今日 / 近 7 天」所用时区偏移（小时），8 = 北京时间 |
 | `AUTO_REDIRECT` | `0` | 大于 0 时页面倒计时 N 秒自动跳转；0 = 只响应点击 |
@@ -173,9 +173,9 @@ www.heyiwei.asia  A/AAAA : （无记录）  ENOTFOUND
      边缘判断: ✓ 解析到 Cloudflare 边缘地址段
   GET /            : HTTP 200 | 12.7 KB | 是否本站页面 ✓ | CSP ✓
   GET 随机路径     : HTTP 404 | body 0 字节  ✓ 符合本站特征（空 404）
-  GET 跳转路径     : HTTP 302 | → https://yzzx.org/  ✓
+  GET 跳转路径     : HTTP 302 | → https://www.yzzx.org/  ✓
   计数写入         : HTTP 200 | configured=true counted=true
-  GET 运维自检     : mode=durable hardened=true target=https://yzzx.org/
+  GET 运维自检     : mode=durable hardened=true target=https://www.yzzx.org/
 ================ 结论 ================
   ✓ 未发现阻断性问题：域名已解析、HTTPS 可访问、流量确实进了本站 Worker。
 ```

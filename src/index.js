@@ -90,7 +90,7 @@ async function route(request, env, ctx) {
 /* ------------------------------------------------------------------ 配置 */
 
 function config(env) {
-  const target = safeUrl(env?.TARGET_URL) ?? safeUrl("https://yzzx.org");
+  const target = safeUrl(env?.TARGET_URL) ?? safeUrl("https://www.yzzx.org");
   const secret = text(env?.API_SECRET, "", 256) || DEFAULT_SECRET;
 
   if (secret === DEFAULT_SECRET && !warnedWeakSecret) {

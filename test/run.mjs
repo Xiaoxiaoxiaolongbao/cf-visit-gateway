@@ -80,7 +80,7 @@ function mockDO() {
 
 function makeEnv(extra = {}) {
   return {
-    TARGET_URL: "https://yzzx.org",
+    TARGET_URL: "https://www.yzzx.org",
     SITE_TITLE: "测试站点",
     TZ_OFFSET: "8",
     AUTO_REDIRECT: "0",
@@ -343,7 +343,7 @@ test("跳转：只需不可猜前缀即可 302，且计入跳转次数", async (
   // 模拟把链接直接粘进地址栏：没有签名、没有 Origin
   const bare = await hit(env, site.jump);
   assert.equal(bare.res.status, 302);
-  assert.equal(bare.res.headers.get("location"), "https://yzzx.org/");
+  assert.equal(bare.res.headers.get("location"), "https://www.yzzx.org/");
   assert.equal(bare.res.headers.get("cache-control"), "no-store");
   await bare.ctx.settle();
 
@@ -424,7 +424,7 @@ test("运维接口：清零与自检都需要令牌，且不回显令牌", async
   const info = await health.res.json();
   assert.equal(info.mode, "durable");
   assert.equal(info.hardened, true, "设置了 API_SECRET 应报告已加固");
-  assert.equal(info.target, "https://yzzx.org/");
+  assert.equal(info.target, "https://www.yzzx.org/");
   assert.ok(info.jump.endsWith(paths.action.g));
   assert.ok(!JSON.stringify(info).includes(ADMIN_A));
   assert.ok(!JSON.stringify(info).includes(SECRET_A));
@@ -476,7 +476,7 @@ test("非法 TARGET_URL 回退到默认值，标题被转义", async () => {
   assert.equal(info.status, 404, "没有令牌就看不到自检");
 
   const jump = await hit(env, site.jump);
-  assert.equal(jump.res.headers.get("location"), "https://yzzx.org/", "只允许 http/https");
+  assert.equal(jump.res.headers.get("location"), "https://www.yzzx.org/", "只允许 http/https");
 
   assert.ok(site.html.includes("&lt;/script&gt;"), "标题必须被 HTML 转义");
   assert.ok(!site.html.includes("<script>alert(1)"), "不得注入可执行脚本");
