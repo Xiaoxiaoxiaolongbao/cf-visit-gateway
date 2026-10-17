@@ -20,6 +20,8 @@
     "test": "node test/run.mjs",
     "audit": "node scripts/audit-secrets.mjs",
     "paths": "node scripts/paths.mjs",
+    "doctor": "node scripts/doctor.mjs",
+    "doctor:ca": "node --use-system-ca scripts/doctor.mjs",
     "build:single": "node scripts/build-single.mjs",
     "kv:create": "wrangler kv namespace create VISITS",
     "secret:api": "wrangler secret put API_SECRET",

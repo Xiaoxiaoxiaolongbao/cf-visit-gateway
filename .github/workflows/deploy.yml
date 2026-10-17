@@ -45,6 +45,26 @@ jobs:
           cache: npm
       - name: 安装依赖
         run: npm ci
+      # 先检查 4 个 secret 是否齐全：缺了就明确报缺哪个，
+      # 而不是丢一个 wrangler 的晦涩错误让人以为代码有问题。
+      - name: 检查 4 个必需 secret
+        env:
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          API_SECRET: ${{ secrets.API_SECRET }}
+          ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
+        run: |
+          missing=""
+          [ -z "$CF_TOKEN" ] && missing="$missing CLOUDFLARE_API_TOKEN"
+          [ -z "$CF_ACCOUNT" ] && missing="$missing CLOUDFLARE_ACCOUNT_ID"
+          [ -z "$API_SECRET" ] && missing="$missing API_SECRET"
+          [ -z "$ADMIN_TOKEN" ] && missing="$missing ADMIN_TOKEN"
+          if [ -n "$missing" ]; then
+            echo "::error title=缺少仓库 Secret::需要在 Settings → Secrets and variables → Actions 添加：$missing"
+            echo "生成随机串：node -e \"console.log(crypto.randomBytes(32).toString('base64url'))\""
+            exit 1
+          fi
+          echo "4 个 secret 均已配置 ✓"
       - name: 推送 secret 并发布
         uses: cloudflare/wrangler-action@v3
         with:
@@ -55,6 +75,13 @@ jobs:
           secrets: |
             API_SECRET
             ADMIN_TOKEN
+        env:
+          API_SECRET: ${{ secrets.API_SECRET }}
+          ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
+      # 部署后从外部体检一次：域名绑定失败 / 证书未签发 / 流量没进 Worker 都会被指出来
+      - name: 部署后体检
+        run: node scripts/doctor.mjs
+        continue-on-error: true
         env:
           API_SECRET: ${{ secrets.API_SECRET }}
           ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}

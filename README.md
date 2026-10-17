@@ -132,6 +132,55 @@ npm run build:single
 }
 ```
 
+## 域名打不开？先跑一次体检
+
+```bash
+npm run doctor                  # 自动读 wrangler.toml 里 [[routes]] 的域名
+npm run doctor -- heyiwei.asia  # 或手动指定（可传多个）
+npm run doctor:ca               # 本机有 TLS 检查代理（报 UNABLE_TO_VERIFY_LEAF_SIGNATURE）时用这个
+```
+
+它从外部逐层判定，把故障**归因到具体一层**并给出对应修法：
+
+| 体检项 | 判读 |
+| --- | --- |
+| A/AAAA/CNAME | 主机名是否解析、是否指向 Cloudflare 边缘地址段 |
+| 权威 NS | zone 是否已托管在 Cloudflare——用于区分「域名没接入」与「主机名没绑定」 |
+| `GET /` | 状态码、是否真的是本项目页面、CSP 是否生效、cf-ray 是否存在 |
+| `GET /favicon.svg` | 静态资源是否被 Worker 处理 |
+| `GET 随机路径` | 必须返回**空 body 的 404**；若返回带 body 的 404 或 200，说明流量没进本项目 Worker |
+| 跳转路径 | 是否 302 到 `TARGET_URL` |
+| 计数写入 | 带签名 POST 后的 `configured` / `counted` / 总数 |
+| 隐藏路径（可选） | 本机能读到 `API_SECRET` 时，核对该部署的派生前缀，并提示是否仍在用默认盐 |
+
+### 实测：`heyiwei.asia` 打不开的原因
+
+```
+heyiwei.asia      A/AAAA : （无记录）  权威 NS : june / lochlan.ns.cloudflare.com  ✓ 已托管在 Cloudflare
+www.heyiwei.asia  A/AAAA : （无记录）  ENOTFOUND
+结论：域名已经交给 Cloudflare 托管，但没有任何主机名绑定到 Worker —— 浏览器在 DNS 阶段就失败
+```
+
+修法就是 `wrangler.toml` 里已经写好的这两段（裸域与 www 是两个主机名，必须各绑一次）：
+
+```toml
+[[routes]]
+pattern = "heyiwei.asia"
+custom_domain = true
+
+[[routes]]
+pattern = "www.heyiwei.asia"
+custom_domain = true
+```
+
+`npm run deploy` 之后 Cloudflare 会自动创建代理 A/AAAA 记录并签发证书。三种典型失败：
+
+- **报记录冲突**：该主机名上已有 A/AAAA/CNAME 记录，先删掉冲突记录，或改用面板 Worker → Settings → Domains & Routes → Add custom domain。
+- **报找不到 zone**：`heyiwei.asia` 这个 zone 不在当前 Cloudflare 账号（或 NS 尚未生效）。Worker 与域名必须在同一账号。
+- **部署成功但仍打不开**：先 `npm run doctor`，看是「解析到非 Cloudflare IP」（未开代理/被劫持）还是「404 带 body」（流量没进 Worker）。
+
+不想用自定义域名就把这两段删掉，`workers.dev` 地址照常可用；GitHub Actions 在部署后会自动跑一次体检并在日志里输出同样的结论。
+
 ## 这套隐藏能挡住什么，挡不住什么
 
 诚实的边界（这决定了防护该放在哪一层）：
@@ -232,11 +281,12 @@ cp .dev.vars.example .dev.vars     # 然后填入两个随机串
 ├── scripts
 │   ├── build-single.mjs   打包单文件版
 │   ├── audit-secrets.mjs  密钥泄露自检
+│   ├── doctor.mjs         部署体检：DNS/HTTP/页面/计数逐层归因
 │   └── paths.mjs          本地推导隐藏路由表
 ├── test
 │   ├── run.mjs       21 个用例：状态机 + DO + 隐藏路由 + 鉴权 + 不可区分性 + 密钥不泄露
 │   └── html-loader.mjs  让 Node 能 import '.html'（对齐 wrangler 的 Text 规则）
-├── wrangler.toml     部署配置、变量、DO 绑定与迁移（不含任何密钥）
+├── wrangler.toml     部署配置、自定义域名 routes、变量、DO 绑定与迁移（不含任何密钥）
 ├── .github/workflows/deploy.yml   测试 + 审计 + 部署
 ├── .dev.vars.example  本地密钥模板（真实值写在 .dev.vars，已被忽略）
 ├── .editorconfig / .gitattributes  缩进与换行符统一
@@ -257,7 +307,7 @@ cp .dev.vars.example .dev.vars     # 然后填入两个随机串
 
 **并发高时会丢计数吗？** `durable` 模式不会（所有请求进同一 DO 实例串行处理）。`kv` 回退模式是读-改-写，高并发下会漂移。
 
-**绑自己的域名？** Dashboard → Worker → Settings → Domains & Routes → Add custom domain，无需改代码。
+**绑自己的域名？** `wrangler.toml` 里已经写好了 `heyiwei.asia` 与 `www.heyiwei.asia` 的 `custom_domain` 路由，`npm run deploy` 即可；换成你的域名就改这两段的 `pattern`。打不开时先 `npm run doctor`，排查流程见上文「域名打不开」。
 
 ## License
 
