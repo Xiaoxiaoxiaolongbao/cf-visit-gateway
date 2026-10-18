@@ -25,6 +25,8 @@ import GALLERY_1 from "../assets/gallery/1.jpg";
 import GALLERY_2 from "../assets/gallery/2.jpg";
 import GALLERY_3 from "../assets/gallery/3.jpg";
 import GALLERY_4 from "../assets/gallery/4.jpg";
+import GALLERY_5 from "../assets/gallery/5.jpg";
+import GALLERY_6 from "../assets/gallery/6.jpg";
 import { createStore } from "./store.js";
 import { emptyView } from "./stats.js";
 import { DEFAULT_SECRET, derivePaths, mintToken, randomId, safeEqual, verifyToken } from "./secret.js";
@@ -69,7 +71,7 @@ async function route(request, env, ctx) {
   if (url.pathname === "/index.html") return servePage(cfg);
   if (url.pathname === "/favicon.svg") return favicon();
   if (url.pathname === "/naiwa.jpg") return avatarImage();
-  const gallery = /^\/gallery\/([1-4])\.jpg$/.exec(url.pathname);
+  const gallery = /^\/gallery\/([1-6])\.jpg$/.exec(url.pathname);
   if (gallery) return galleryImage(Number(gallery[1]));
 
   const paths = await derivePaths(cfg.secret);
@@ -522,7 +524,7 @@ function escapeXml(s) {
 }
 
 /** 风采照片：按编号返回打包进 Worker 的原字节（缓存 7 天） */
-const GALLERY_BYTES = [GALLERY_1, GALLERY_2, GALLERY_3, GALLERY_4];
+const GALLERY_BYTES = [GALLERY_1, GALLERY_2, GALLERY_3, GALLERY_4, GALLERY_5, GALLERY_6];
 
 function galleryImage(index) {
   const raw = GALLERY_BYTES[index - 1];

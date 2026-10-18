@@ -628,7 +628,7 @@ test("风采区：入口与弹窗在页面里，四张照片按原字节提供",
 
   // 四张照片：响应字节与仓库文件逐字节一致
   const sha = (b) => createHash("sha256").update(b).digest("hex");
-  for (const n of [1, 2, 3, 4]) {
+  for (const n of [1, 2, 3, 4, 5, 6]) {
     const res = await hit(env, `/gallery/${n}.jpg`);
     assert.equal(res.res.status, 200, `/gallery/${n}.jpg 应可访问`);
     assert.equal(res.res.headers.get("content-type"), "image/jpeg");
@@ -639,7 +639,7 @@ test("风采区：入口与弹窗在页面里，四张照片按原字节提供",
     assert.ok(site.html.includes(`/gallery/${n}.jpg`), `页面应引用第 ${n} 张`);
   }
 
-  assert.equal((await hit(env, "/gallery/5.jpg")).res.status, 404, "越界编号应 404");
+  assert.equal((await hit(env, "/gallery/7.jpg")).res.status, 404, "越界编号应 404");
   assert.equal((await hit(env, "/gallery/1.png")).res.status, 404);
 });
 
