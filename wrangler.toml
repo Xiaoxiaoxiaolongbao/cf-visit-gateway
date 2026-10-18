@@ -44,6 +44,11 @@ zone_name = "xn--fiqx8ytpbr55a4embir4ug.com"
 pattern = "www.xn--fiqx8ytpbr55a4embir4ug.com"
 custom_domain = true
 
+# 邮箱入口页（收件由 Cloudflare Email Routing 转发到常用邮箱，本页只做状态展示与跳转）
+[[routes]]
+pattern = "mail.xn--fiqx8ytpbr55a4embir4ug.com"
+custom_domain = true
+
 # ---------------------------------------------------------------------------
 # 运行时配置（改完执行 wrangler deploy 生效，无需改代码）
 #
@@ -60,6 +65,11 @@ TZ_OFFSET = "8"                     # 统计"今日"所用时区偏移（小时�
 AUTO_REDIRECT = "0"                 # >0 时页面倒计时 N 秒自动跳转；0 = 只点击跳转
 MIN_INTERVAL_MS = "1200"            # 同一 IP 的最小计数间隔（防刷新刷量）
 ENABLE_BADGE = "false"              # true 才开放 /<prefix>/b 徽章（等同公开只读计数）
+
+# --- 邮箱入口页 mail.江苏省奶蛙中学.com ---
+MAIL_ZONE_LABEL = "江苏省奶蛙中学.com"  # 页面上展示的可读域名
+MAIL_FORWARD_TO = "228077668@qq.com"  # 收件转发目标（页面上会脱敏展示）
+MAIL_DASH_URL = "https://dash.cloudflare.com/05389e0b486b83cef368ded14cf44c21/xn--fiqx8ytpbr55a4embir4ug.com/email/routing"
 
 # ---------------------------------------------------------------------------
 # 精确计数：Durable Object（Free 计划仅支持 SQLite 后端，必须用 new_sqlite_classes）

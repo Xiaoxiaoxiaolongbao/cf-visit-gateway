@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>邮箱 · {{TITLE}}</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<style nonce="{{NONCE}}">
+  :root {
+    --paper: #f5f5f7; --ink: #8a8a8f; --ink-soft: #63636a;
+    --hair: rgba(255,255,255,.085); --hair-strong: rgba(255,255,255,.16);
+    --black: #050506; --ok: #3fa86a; --warn: #d8bb62;
+    --ease: cubic-bezier(.16,1,.3,1);
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100svh; background: var(--black); color: var(--paper);
+    display: flex; align-items: center; justify-content: center; padding: 48px 24px;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue",
+                 "PingFang SC", "Microsoft YaHei", sans-serif;
+    font-size: 15px; line-height: 1.55; -webkit-font-smoothing: antialiased;
+  }
+  body::before {
+    content: ""; position: fixed; left: 50%; top: -18vh; width: 120vw; height: 90vh;
+    transform: translateX(-50%); pointer-events: none; z-index: 0;
+    background: radial-gradient(38% 34% at 42% 12%, rgba(255,255,255,.13), transparent 68%);
+  }
+  main { position: relative; z-index: 1; width: min(560px, 100%); }
+  .seam {
+    height: 1px; margin: 0 0 30px;
+    background: linear-gradient(90deg, transparent, var(--hair-strong) 22%, var(--hair-strong) 78%, transparent);
+  }
+  .kicker {
+    margin: 0 0 26px; font-family: var(--mono); font-size: 10.5px;
+    letter-spacing: .22em; text-transform: uppercase; color: var(--ink-soft);
+  }
+  h1 { margin: 0 0 6px; font-size: 30px; font-weight: 500; letter-spacing: -.03em; }
+  .sub { margin: 0 0 34px; font-size: 14px; color: var(--ink); }
+  .addr {
+    display: block; margin: 0 0 30px; padding: 16px 18px; border: 1px solid var(--hair);
+    border-radius: 10px; font-family: var(--mono); font-size: 13px; letter-spacing: .02em;
+    color: var(--paper); word-break: break-all;
+  }
+  .addr b { color: var(--ink-soft); font-weight: 400; }
+  .rows { list-style: none; margin: 0 0 30px; padding: 0; border-top: 1px solid var(--hair); }
+  .rows li {
+    display: flex; justify-content: space-between; gap: 14px; padding: 12px 0;
+    border-bottom: 1px solid var(--hair); font-size: 13px;
+  }
+  .rows span { color: var(--ink-soft); }
+  .rows em { font-style: normal; font-family: var(--mono); font-size: 12px; color: var(--paper); }
+  .rows em.on { color: var(--ok); }
+  .rows em.off { color: var(--warn); }
+  .actions { display: flex; flex-wrap: wrap; gap: 12px; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px; padding: 11px 22px;
+    border-radius: 980px; text-decoration: none; font-size: 14px; font-weight: 500;
+    border: 1px solid var(--hair-strong); color: var(--paper);
+    transition: background-color .2s ease, border-color .2s ease;
+  }
+  .btn:hover { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.28); }
+  .btn.primary { background: var(--paper); color: #0a0a0c; border-color: var(--paper); }
+  .btn.primary:hover { background: #fff; }
+  .note {
+    margin: 34px 0 0; padding-top: 18px; border-top: 1px solid var(--hair);
+    font-size: 12px; line-height: 1.9; color: var(--ink-soft);
+  }
+  .note code { font-family: var(--mono); font-size: 11.5px; color: var(--ink); }
+  @media (max-width: 520px) {
+    h1 { font-size: 24px; }
+    .actions { flex-direction: column; align-items: stretch; }
+    .btn { justify-content: center; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <div class="seam"></div>
+  <p class="kicker">Mail &middot; {{ZONE}}</p>
+
+  <h1>学校邮箱</h1>
+  <p class="sub">任何前缀都能收，邮件转发到你的常用邮箱。</p>
+
+  <code class="addr">*@{{ZONE}} <b>&rarr;</b> {{DEST}}</code>
+
+  <ul class="rows">
+    <li><span>收件（MX 记录）</span><em class="{{MX_CLASS}}">{{MX_TEXT}}</em></li>
+    <li><span>转发目标</span><em>{{DEST}}</em></li>
+    <li><span>发件</span><em class="off">需第三方代发</em></li>
+  </ul>
+
+  <div class="actions">
+    <a class="btn primary" href="https://mail.qq.com/" target="_blank" rel="noopener noreferrer">打开 QQ 邮箱</a>
+    <a class="btn" href="{{DASH_URL}}" target="_blank" rel="noopener noreferrer">Cloudflare 邮件路由</a>
+  </div>
+
+  <p class="note">
+    收件由 Cloudflare Email Routing 免费完成：在面板启用后，MX 会自动写入 DNS，
+    随后把目标地址加进「Destination addresses」并在邮箱里点一次确认链接即可。<br>
+    发件不由本域直接投递（Cloudflare 不提供邮箱账号与 IMAP/SMTP）；
+    想在 QQ 邮箱里以 <code>@{{ZONE}}</code> 的身份回信，可在 QQ 邮箱设置里添加「其他邮箱」并用其 SMTP 代发。
+  </p>
+</main>
+</body>
+</html>
