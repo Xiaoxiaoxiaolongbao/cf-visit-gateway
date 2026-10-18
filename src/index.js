@@ -3,7 +3,7 @@
  *
  * 对外只暴露三个东西：
  *   GET  /                静态统计页（唯一公开入口）
- *   GET  /favicon.svg     站点图标
+ *   GET  /favicon.ico     站点图标（扬州中学校徽）
  *   GET  /<prefix>/g      302 跳转到目标站（prefix 由密钥派生，不可猜，可对外分享）
  *
  * 其余全部接口都藏在派生前缀之下，且需要「按时间窗轮换的 HMAC 签名」才可用：
@@ -27,6 +27,8 @@ import GALLERY_3 from "../assets/gallery/3.jpg";
 import GALLERY_4 from "../assets/gallery/4.jpg";
 import GALLERY_5 from "../assets/gallery/5.jpg";
 import GALLERY_6 from "../assets/gallery/6.jpg";
+import FAVICON_ICO from "../assets/favicon.ico";
+import FAVICON_PNG from "../assets/favicon.png";
 import { createStore } from "./store.js";
 import { emptyView } from "./stats.js";
 import { DEFAULT_SECRET, derivePaths, mintToken, randomId, safeEqual, verifyToken } from "./secret.js";
@@ -69,7 +71,8 @@ async function route(request, env, ctx) {
   if ((url.pathname === "/" || url.pathname === "/index.html") && isMailHost) return serveMailPage(cfg, url);
   if (url.pathname === "/") return servePage(cfg);
   if (url.pathname === "/index.html") return servePage(cfg);
-  if (url.pathname === "/favicon.svg") return favicon();
+  if (url.pathname === "/favicon.ico") return icon(FAVICON_ICO, "image/x-icon");
+  if (url.pathname === "/favicon.png") return icon(FAVICON_PNG, "image/png");
   if (url.pathname === "/naiwa.jpg") return avatarImage();
   const gallery = /^\/gallery\/([1-6])\.jpg$/.exec(url.pathname);
   if (gallery) return galleryImage(Number(gallery[1]));
@@ -551,11 +554,11 @@ function avatarImage() {
   });
 }
 
-function favicon() {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#0d0d10"/><path d="M16 3a13 13 0 0 0 0 26z" fill="#f5f5f7"/><circle cx="16" cy="16" r="15" fill="none" stroke="#f5f5f7" stroke-opacity=".28"/></svg>`;
-  return new Response(svg, {
+function icon(module, contentType) {
+  const bytes = module instanceof ArrayBuffer ? new Uint8Array(module) : module;
+  return new Response(bytes, {
     headers: {
-      "content-type": "image/svg+xml; charset=utf-8",
+      "content-type": contentType,
       "cache-control": "public, max-age=86400",
       "x-content-type-options": "nosniff",
     },
