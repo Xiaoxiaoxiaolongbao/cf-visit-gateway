@@ -278,9 +278,14 @@ test("公开面：只暴露 / 与 favicon，旧接口与常见探测路径一律
     assert.equal(res.headers.get("content-type"), null, `${path} 不应暴露类型`);
   }
 
-  const favicon = await hit(env, "/favicon.svg");
-  assert.equal(favicon.res.status, 200);
-  assert.match(favicon.res.headers.get("content-type"), /image\/svg\+xml/);
+  const favicon = await hit(env, "/favicon.ico");
+  assert.equal(favicon.res.status, 200, "站点图标应为扬州中学校徽 ico");
+  assert.match(favicon.res.headers.get("content-type"), /image\/x-icon/);
+  const faviconPng = await hit(env, "/favicon.png");
+  assert.equal(faviconPng.res.status, 200);
+  assert.match(faviconPng.res.headers.get("content-type"), /image\/png/);
+  const iconBytes = Buffer.from(await favicon.res.arrayBuffer());
+  assert.equal(iconBytes.subarray(0, 4).toString("hex"), "00000100", "ico 魔数应为 00000100");
 
   const paths = await derivePaths(SECRET_A);
   assert.equal((await hit(env, `/${paths.prefix}/x`)).res.status, 404, "前缀对但动作不对也应 404");

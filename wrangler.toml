@@ -60,7 +60,7 @@ custom_domain = true
 # ---------------------------------------------------------------------------
 [vars]
 TARGET_URL = "https://www.yzzx.org"  # 跳转目标。只接受 http/https，其它协议自动回退默认值
-SITE_TITLE = "本站访客统计"           # 页面标题
+SITE_TITLE = "奶蛙护送你前往扬州中学"   # 页面标题（浏览器标签页名称）
 TZ_OFFSET = "8"                     # 统计"今日"所用时区偏移（小时，8 = 北京时间）
 AUTO_REDIRECT = "0"                 # >0 时页面倒计时 N 秒自动跳转；0 = 只点击跳转
 MIN_INTERVAL_MS = "1200"            # 同一 IP 的最小计数间隔（防刷新刷量）
@@ -96,11 +96,10 @@ new_sqlite_classes = ["Counter"]
 [[rules]]
 type = "Text"
 globs = ["**/*.html"]
-fallthrough = true
 
 [[rules]]
 type = "Data"
-globs = ["**/*.jpg"]
+globs = ["**/*.jpg", "**/*.ico", "**/*.png"]
 fallthrough = true
 
 [observability]
