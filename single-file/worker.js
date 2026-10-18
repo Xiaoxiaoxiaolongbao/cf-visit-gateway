@@ -190,10 +190,10 @@ var page_default = `<!DOCTYPE html>
   .exhibit { position: relative; width: min(300px, 56vw, 34vh); margin: 0 auto; animation: reveal 1.3s .1s var(--ease) both; }
   .frame {
     position: relative; aspect-ratio: 1 / 1; border-radius: 50%; overflow: hidden;
+    background: var(--hover-fill);
     box-shadow: 0 0 0 1px var(--hair-strong);
   }
   .frame .naiwa-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; }
-  .frame .naiwa-fallback { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; }
   /* 镜面高光：只占左上约 1/4 的一层柔光，不做全屏 bloom */
   .frame::after {
     content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none; mix-blend-mode: screen;
@@ -404,35 +404,7 @@ var page_default = `<!DOCTYPE html>
   <div class="exhibit">
     <div class="frame">
       <img class="naiwa-img" src="/naiwa.jpg" alt="奶蛙" width="512" height="512" decoding="async" fetchpriority="high">
-      <svg class="naiwa-fallback" viewBox="0 0 200 200" aria-hidden="true">
-        <defs>
-          <radialGradient id="naiwaBg" cx="50%" cy="34%" r="78%">
-            <stop offset="0" stop-color="#1b2540"/>
-            <stop offset="100%" stop-color="#0a1020"/>
-          </radialGradient>
-          <radialGradient id="naiwaSkin" cx="38%" cy="26%" r="86%">
-            <stop offset="0" stop-color="#e6f8ec"/>
-            <stop offset="46%" stop-color="#a9e7bd"/>
-            <stop offset="100%" stop-color="#57b881"/>
-          </radialGradient>
-        </defs>
-        <circle cx="100" cy="100" r="100" fill="url(#naiwaBg)"/>
-        <circle cx="78" cy="52" r="17" fill="#ffffff" opacity=".93"/>
-        <circle cx="101" cy="41" r="23" fill="#ffffff"/>
-        <circle cx="125" cy="53" r="15" fill="#ffffff" opacity=".90"/>
-        <ellipse cx="100" cy="120" rx="61" ry="53" fill="url(#naiwaSkin)"/>
-        <circle cx="64" cy="78" r="26" fill="#f7fffb"/>
-        <circle cx="136" cy="78" r="26" fill="#f7fffb"/>
-        <circle cx="66" cy="80" r="12" fill="#17281f"/>
-        <circle cx="134" cy="80" r="12" fill="#17281f"/>
-        <circle cx="61" cy="74" r="4.4" fill="#ffffff"/>
-        <circle cx="129" cy="74" r="4.4" fill="#ffffff"/>
-        <circle cx="90" cy="124" r="3.2" fill="#3c6b52" opacity=".65"/>
-        <circle cx="110" cy="124" r="3.2" fill="#3c6b52" opacity=".65"/>
-        <path d="M76 142 q24 22 48 0" fill="none" stroke="#2f5d43" stroke-width="5" stroke-linecap="round"/>
-        <ellipse cx="46" cy="146" rx="14" ry="9" fill="#ff9db1" opacity=".45"/>
-        <ellipse cx="154" cy="146" rx="14" ry="9" fill="#ff9db1" opacity=".45"/>
-      </svg>
+      
     </div>
   </div>
 
@@ -1412,7 +1384,7 @@ function avatarImage() {
   });
 }
 function favicon() {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><linearGradient id="a" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6366f1"/><stop offset="1" stop-color="#22d3ee"/></linearGradient></defs><rect width="64" height="64" rx="14" fill="#0b1020"/><circle cx="32" cy="32" r="17" fill="none" stroke="url(#a)" stroke-width="4"/><circle cx="32" cy="32" r="6" fill="url(#a)"/></svg>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" fill="#0d0d10"/><path d="M16 3a13 13 0 0 0 0 26z" fill="#f5f5f7"/><circle cx="16" cy="16" r="15" fill="none" stroke="#f5f5f7" stroke-opacity=".28"/></svg>`;
   return new Response(svg, {
     headers: {
       "content-type": "image/svg+xml; charset=utf-8",
