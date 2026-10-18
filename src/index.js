@@ -21,6 +21,10 @@
 import PAGE from "./page.html";
 import MAIL_PAGE from "./mail.html";
 import NAIWA_BYTES from "../assets/naiwa.jpg";
+import GALLERY_1 from "../assets/gallery/1.jpg";
+import GALLERY_2 from "../assets/gallery/2.jpg";
+import GALLERY_3 from "../assets/gallery/3.jpg";
+import GALLERY_4 from "../assets/gallery/4.jpg";
 import { createStore } from "./store.js";
 import { emptyView } from "./stats.js";
 import { DEFAULT_SECRET, derivePaths, mintToken, randomId, safeEqual, verifyToken } from "./secret.js";
@@ -65,6 +69,8 @@ async function route(request, env, ctx) {
   if (url.pathname === "/index.html") return servePage(cfg);
   if (url.pathname === "/favicon.svg") return favicon();
   if (url.pathname === "/naiwa.jpg") return avatarImage();
+  const gallery = /^\/gallery\/([1-4])\.jpg$/.exec(url.pathname);
+  if (gallery) return galleryImage(Number(gallery[1]));
 
   const paths = await derivePaths(cfg.secret);
   const action = paths.byPath.get(url.pathname);
@@ -513,6 +519,22 @@ function escapeHtml(s) {
 
 function escapeXml(s) {
   return escapeHtml(s);
+}
+
+/** 风采照片：按编号返回打包进 Worker 的原字节（缓存 7 天） */
+const GALLERY_BYTES = [GALLERY_1, GALLERY_2, GALLERY_3, GALLERY_4];
+
+function galleryImage(index) {
+  const raw = GALLERY_BYTES[index - 1];
+  if (!raw) return notFound();
+  const bytes = raw instanceof ArrayBuffer ? new Uint8Array(raw) : raw;
+  return new Response(bytes, {
+    headers: {
+      "content-type": "image/jpeg",
+      "cache-control": "public, max-age=604800",
+      "x-content-type-options": "nosniff",
+    },
+  });
 }
 
 /** 顶部圆形头像：真实奶蛙素材，按原字节提供（浏览器可缓存 1 天） */

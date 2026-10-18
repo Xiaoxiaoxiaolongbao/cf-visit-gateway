@@ -607,6 +607,42 @@ test("邮件页：mail 子域返回入口页，转发地址必须脱敏", async 
   assert.ok(normalHtml.includes("你是第"));
 });
 
+test("风采区：入口与弹窗在页面里，四张照片按原字节提供", async () => {
+  const env = makeEnv({ COUNTER: mockDO() });
+  const site = await openSite(env);
+
+  // 入口与弹窗结构
+  assert.ok(site.html.includes('id="gallery-open"'), "应有风采入口");
+  assert.ok(site.html.includes('id="lightbox"'), "应有同页弹窗");
+  assert.ok(site.html.includes("奶蛙中学风采"), "应有区块标题");
+  assert.ok(site.html.includes("（可投稿）"), "标题应标注可投稿");
+  assert.ok(site.html.includes("想投稿？QQ+2751404400"), "弹窗底部应有投稿 QQ");
+  assert.ok(/class="lightbox-foot"/.test(site.html), "投稿信息应是小字样式");
+  assert.ok(site.html.includes('aria-modal="true"'), "弹窗应具备对话框语义");
+  assert.equal(/id="lightbox"[^>]*hidden/.test(site.html), true, "弹窗默认隐藏");
+
+  // 入口在跳转按钮之后
+  const ctaIdx = site.html.indexOf('id="cta"');
+  const galleryIdx = site.html.indexOf('id="gallery-open"');
+  assert.ok(ctaIdx > 0 && galleryIdx > ctaIdx, "风采入口必须位于跳转按钮下方");
+
+  // 四张照片：响应字节与仓库文件逐字节一致
+  const sha = (b) => createHash("sha256").update(b).digest("hex");
+  for (const n of [1, 2, 3, 4]) {
+    const res = await hit(env, `/gallery/${n}.jpg`);
+    assert.equal(res.res.status, 200, `/gallery/${n}.jpg 应可访问`);
+    assert.equal(res.res.headers.get("content-type"), "image/jpeg");
+    assert.match(res.res.headers.get("cache-control"), /max-age=\d+/);
+    const served = Buffer.from(await res.res.arrayBuffer());
+    const onDisk = readFileSync(resolve(HERE, `../assets/gallery/${n}.jpg`));
+    assert.equal(sha(served), sha(onDisk), `/gallery/${n}.jpg 字节必须一致`);
+    assert.ok(site.html.includes(`/gallery/${n}.jpg`), `页面应引用第 ${n} 张`);
+  }
+
+  assert.equal((await hit(env, "/gallery/5.jpg")).res.status, 404, "越界编号应 404");
+  assert.equal((await hit(env, "/gallery/1.png")).res.status, 404);
+});
+
 /* ------------------------------------------------------------------ 运行 */
 
 let failed = 0;

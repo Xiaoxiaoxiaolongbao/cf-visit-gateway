@@ -157,6 +157,53 @@
   .corner a:focus-visible { outline: 1px solid var(--hair-strong); outline-offset: 3px; border-radius: 4px; }
   .corner svg { display: block; width: 15px; height: 15px; }
 
+
+  /* 风采入口：细线行，像目录条目 */
+  .gallery-entry {
+    display: flex; align-items: center; gap: 14px; width: 100%; margin: 32px 0 0;
+    padding: 15px 18px; border: 1px solid var(--hair); border-radius: 12px;
+    background: transparent; color: var(--paper); cursor: pointer; text-align: left; font: inherit;
+    transition: border-color .25s ease, background-color .25s ease;
+    animation: reveal 1s .44s var(--ease) both;
+  }
+  .gallery-entry:hover { border-color: var(--hair-strong); background: rgba(255, 255, 255, .03); }
+  .gallery-entry:focus-visible { outline: 2px solid var(--hair-strong); outline-offset: 3px; }
+  .gallery-kicker {
+    flex: none; font-family: var(--mono); font-size: 9.5px; letter-spacing: .2em;
+    text-transform: uppercase; color: var(--ink-soft);
+  }
+  .gallery-title { flex: 1; font-size: 14px; letter-spacing: .01em; }
+  .gallery-title small { margin-left: 6px; font-size: 12px; color: var(--ink-soft); }
+  .gallery-chev { flex: none; width: 14px; height: 14px; color: var(--ink-soft); transition: color .25s ease; }
+  .gallery-entry:hover .gallery-chev { color: var(--paper); }
+
+  /* 风采弹窗 */
+  .lightbox { position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; padding: 24px; }
+  .lightbox[hidden] { display: none; }
+  .lightbox-scrim { position: absolute; inset: 0; background: rgba(0, 0, 0, .76); }
+  .lightbox-panel {
+    position: relative; z-index: 1; width: min(760px, 100%); max-height: 86vh; overflow-y: auto;
+    padding: 22px 22px 20px; background: #08080a; border: 1px solid var(--hair-strong);
+    border-radius: 14px; box-shadow: 0 40px 120px -40px rgba(0, 0, 0, .95);
+    animation: reveal .5s var(--ease) both;
+  }
+  .lightbox-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+  .lightbox-head h2 { margin: 0; font-size: 15px; font-weight: 500; letter-spacing: .01em; }
+  .lightbox-close {
+    width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--hair);
+    background: transparent; color: var(--ink); font-size: 17px; line-height: 1; cursor: pointer;
+    transition: color .2s ease, border-color .2s ease;
+  }
+  .lightbox-close:hover { color: var(--paper); border-color: var(--hair-strong); }
+  .lightbox-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .lightbox-grid img { display: block; width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--hair); }
+  .lightbox-foot { margin: 20px 0 0; font-size: 11.5px; letter-spacing: .02em; color: var(--ink-soft); text-align: center; }
+  @media (max-width: 520px) {
+    .lightbox { padding: 14px; }
+    .lightbox-panel { padding: 16px; max-height: 90vh; }
+    .lightbox-grid { grid-template-columns: 1fr; }
+  }
+
   /* 矮屏：压缩纵向节奏，保证主按钮始终留在首屏 */
   @media (max-height: 880px) {
     .seam { margin-bottom: 22px; }
@@ -253,7 +300,30 @@
     </a>
     <p class="dest">{{HOST}}</p>
   </div>
+
+  <button class="gallery-entry" type="button" id="gallery-open" aria-haspopup="dialog" aria-controls="lightbox">
+    <span class="gallery-kicker">Gallery</span>
+    <span class="gallery-title">奶蛙中学风采<small>（可投稿）</small></span>
+    <svg class="gallery-chev" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+  </button>
 </main>
+  <div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-labelledby="lightbox-title" hidden>
+    <div class="lightbox-scrim" data-close></div>
+    <div class="lightbox-panel">
+      <div class="lightbox-head">
+        <h2 id="lightbox-title">奶蛙中学风采</h2>
+        <button class="lightbox-close" type="button" id="lightbox-close" aria-label="关闭">&times;</button>
+      </div>
+      <div class="lightbox-grid">
+        <img src="/gallery/1.jpg" alt="奶蛙中学风采 1" width="800" height="640" loading="lazy" decoding="async">
+        <img src="/gallery/2.jpg" alt="奶蛙中学风采 2" width="800" height="640" loading="lazy" decoding="async">
+        <img src="/gallery/3.jpg" alt="奶蛙中学风采 3" width="800" height="640" loading="lazy" decoding="async">
+        <img src="/gallery/4.jpg" alt="奶蛙中学风采 4" width="800" height="640" loading="lazy" decoding="async">
+      </div>
+      <p class="lightbox-foot">想投稿？QQ+2751404400</p>
+    </div>
+  </div>
+
 
   <!-- 右上角：GitHub 与哔哩哔哩（图标取自 simple-icons，内联无外链） -->
   <nav class="corner" aria-label="联系方式">
@@ -355,6 +425,37 @@
     }
 
     boot();
+
+    /* 风采弹窗：打开 / 关闭 / ESC / 点遮罩关闭 / 焦点归还 */
+    (function initLightbox() {
+      var openBtn = byId("gallery-open");
+      var box = byId("lightbox");
+      var closeBtn = byId("lightbox-close");
+      if (!openBtn || !box || !closeBtn) return;
+      var lastFocus = null;
+
+      function openBox() {
+        lastFocus = document.activeElement;
+        box.hidden = false;
+        document.documentElement.style.overflow = "hidden";
+        closeBtn.focus();
+      }
+      function closeBox() {
+        box.hidden = true;
+        document.documentElement.style.overflow = "";
+        if (lastFocus && typeof lastFocus.focus === "function") lastFocus.focus();
+      }
+
+      openBtn.addEventListener("click", openBox);
+      closeBtn.addEventListener("click", closeBox);
+      box.addEventListener("click", function (event) {
+        var el = event.target;
+        if (el && el.nodeType === 1 && el.hasAttribute("data-close")) closeBox();
+      });
+      document.addEventListener("keydown", function (event) {
+        if (event.key === "Escape" && !box.hidden) closeBox();
+      });
+    })();
   })();
 </script>
 </body>

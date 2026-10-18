@@ -113,6 +113,7 @@ npm run build:single
 | `/` | GET | 公开 | 统计页，唯一入口 |
 | `/favicon.svg` | GET | 公开 | 站点图标 |
 | `/naiwa.jpg` | GET | 公开 | 首页顶部的圆形奶蛙头像（512×512 JPEG，约 26 KB，缓存 1 天） |
+| `/gallery/1..4.jpg` | GET | 公开 | 「奶蛙中学风采」弹窗里的四张照片（宽度上限 800px，合计约 172 KB，缓存 7 天） |
 | `/{prefix}/g` | GET | 仅前缀 | 302 到目标站并计入跳转次数；**这是唯一可对外分享的隐藏路径** |
 | `/{prefix}/v` | POST | 前缀 + 签名 | 记录一次访问；**只返回位次相关字段**（`uv` / `first` / `configured` / `counted`） |
 | `/{prefix}/s` | GET | 前缀 + 签名 | 读取位次（同样只给 `uv`，不下发其它计数） |
