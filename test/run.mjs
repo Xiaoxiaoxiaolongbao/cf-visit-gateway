@@ -573,7 +573,10 @@ test("静态资源：奶蛙头像按原字节提供，且页面确实引用它",
   const site = await openSite(env);
   assert.ok(site.html.includes('src="/naiwa.jpg"'), "页面必须引用该头像");
   assert.ok(site.html.includes('class="naiwa-img"'), "头像必须走真实素材这一层");
-  assert.ok(site.html.includes('class="naiwa-fallback"'), "应保留加载失败时的 SVG 兜底");
+  assert.equal(site.html.includes("naiwa-fallback"), false, "不应再带手绘兜底青蛙");
+  assert.equal(site.html.includes("naiwaSkin"), false, "兜底 SVG 的渐变定义应彻底移除");
+  assert.match(site.html, /class="naiwa-img"[^>]*alt="[^"]+"/, "真图必须有 alt");
+  assert.match(site.html, /class="naiwa-img"[^>]*width="512"[^>]*height="512"/, "真图应带尺寸避免布局跳动");
 
   // 隐藏路由纪律不能被静态资源破坏
   assert.equal((await hit(env, "/naiwa.jpg.bak")).res.status, 404);
