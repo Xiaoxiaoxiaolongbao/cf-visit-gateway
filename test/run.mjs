@@ -580,6 +580,33 @@ test("静态资源：奶蛙头像按原字节提供，且页面确实引用它",
   assert.equal((await hit(env, "/assets/naiwa.jpg")).res.status, 404, "资源只从固定公开路径提供");
 });
 
+test("邮件页：mail 子域返回入口页，转发地址必须脱敏", async () => {
+  const env = makeEnv({
+    COUNTER: mockDO(),
+    MAIL_ZONE_LABEL: "测试中学.com",
+    MAIL_FORWARD_TO: "228077668@qq.com",
+    MAIL_MX_DISABLE: "1",
+  });
+  const res = await worker.fetch(new Request("https://mail.gateway.example/"), env, makeCtx());
+  assert.equal(res.status, 200);
+  const html = await res.text();
+
+  assert.ok(html.includes("学校邮箱"));
+  assert.ok(html.includes("测试中学.com"));
+  assert.ok(html.includes("2280****68@qq.com"), "转发地址应脱敏展示");
+  assert.ok(!html.includes("228077668@qq.com"), "不得暴露完整转发地址");
+  assert.ok(!html.includes("{{"), "占位符必须全部替换");
+  assert.equal(res.headers.get("cache-control"), "no-store");
+  assert.match(res.headers.get("content-security-policy"), /default-src 'none'/);
+  assert.ok(res.headers.get("content-security-policy").includes("nonce-"));
+
+  // 普通域名不能走邮件页
+  const normal = await worker.fetch(new Request("https://gateway.example/"), env, makeCtx());
+  const normalHtml = await normal.text();
+  assert.ok(!normalHtml.includes("学校邮箱"));
+  assert.ok(normalHtml.includes("你是第"));
+});
+
 /* ------------------------------------------------------------------ 运行 */
 
 let failed = 0;

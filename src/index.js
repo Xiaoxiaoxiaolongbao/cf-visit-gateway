@@ -19,6 +19,7 @@
  */
 
 import PAGE from "./page.html";
+import MAIL_PAGE from "./mail.html";
 import NAIWA_BYTES from "../assets/naiwa.jpg";
 import { createStore } from "./store.js";
 import { emptyView } from "./stats.js";
@@ -58,6 +59,8 @@ async function route(request, env, ctx) {
   const cfg = config(env);
   const url = new URL(request.url);
 
+  const isMailHost = url.hostname.startsWith("mail.");
+  if ((url.pathname === "/" || url.pathname === "/index.html") && isMailHost) return serveMailPage(cfg, url);
   if (url.pathname === "/") return servePage(cfg);
   if (url.pathname === "/index.html") return servePage(cfg);
   if (url.pathname === "/favicon.svg") return favicon();
@@ -113,6 +116,10 @@ function config(env) {
     auto: clampInt(env?.AUTO_REDIRECT, 0, 0, 300),
     minInterval: clampInt(env?.MIN_INTERVAL_MS, 1200, 0, 60000),
     adminToken: text(env?.ADMIN_TOKEN, "", 200),
+    mailZone: text(env?.MAIL_ZONE_LABEL, "", 120) || new URL(target).host,
+    mailDest: text(env?.MAIL_FORWARD_TO, "", 120),
+    mailDash: text(env?.MAIL_DASH_URL, "", 300),
+    mailProbeOff: String(env?.MAIL_MX_DISABLE ?? "") === "1",
     secret,
     hardened: secret !== DEFAULT_SECRET,
     badge: truthy(env?.ENABLE_BADGE),
@@ -183,6 +190,69 @@ async function servePage(cfg) {
       "cross-origin-resource-policy": "same-origin",
     },
   });
+}
+
+/* -------------------------------------------------------------- 邮件页 */
+
+/** 用 Cloudflare DoH 查 MX，判断 Email Routing 是否已生效（s-maxage 60s 由页面响应头控制，这里用 isolate 内存缓存） */
+let mxCache = { at: 0, value: null };
+
+async function probeMx(zone, disabled) {
+  if (disabled) return { state: "skip", text: "未查询（测试模式）", cls: "" };
+  if (mxCache.value && Date.now() - mxCache.at < 60000) return mxCache.value;
+
+  let value;
+  try {
+    const res = await fetch(`https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(zone)}&type=MX`, {
+      headers: { accept: "application/dns-json" },
+      signal: AbortSignal.timeout(2500),
+    });
+    const body = await res.json();
+    const answers = (body.Answer || []).filter((a) => a.type === 15).map((a) => a.data);
+    if (!answers.length) value = { state: "off", text: "未启用", cls: "off" };
+    else if (answers.some((d) => /mx\.cloudflare\.net/i.test(d))) value = { state: "on", text: "已启用（Cloudflare Email Routing）", cls: "on" };
+    else value = { state: "other", text: `已指向其它服务商（${answers.length} 条 MX）`, cls: "on" };
+  } catch {
+    value = { state: "unknown", text: "查询失败", cls: "" };
+  }
+  mxCache = { at: Date.now(), value };
+  return value;
+}
+
+async function serveMailPage(cfg, url) {
+  const nonce = randomId(16);
+  const mx = await probeMx(url.hostname.replace(/^mail\./, ""), cfg.mailProbeOff);
+  const dest = cfg.mailDest ? maskAddress(cfg.mailDest) : "未配置转发目标";
+
+  const html = MAIL_PAGE.replaceAll("{{TITLE}}", escapeHtml(cfg.title))
+    .replaceAll("{{NONCE}}", nonce)
+    .replaceAll("{{ZONE}}", escapeHtml(cfg.mailZone))
+    .replaceAll("{{DEST}}", escapeHtml(dest))
+    .replaceAll("{{MX_TEXT}}", escapeHtml(mx.text))
+    .replaceAll("{{MX_CLASS}}", escapeHtml(mx.cls))
+    .replaceAll("{{DASH_URL}}", escapeHtml(cfg.mailDash));
+
+  return new Response(html, {
+    headers: {
+      "content-type": "text/html; charset=utf-8",
+      "cache-control": "no-store",
+      "content-security-policy":
+        `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'nonce-${nonce}'; ` +
+        "img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+      "referrer-policy": "no-referrer",
+      "x-content-type-options": "nosniff",
+    },
+  });
+}
+
+/** 邮箱地址脱敏：228077668@qq.com -> 2280****68@qq.com */
+function maskAddress(address) {
+  const at = address.indexOf("@");
+  if (at <= 0) return address;
+  const local = address.slice(0, at);
+  const domain = address.slice(at);
+  if (local.length <= 4) return local[0] + "***" + domain;
+  return local.slice(0, 4) + "****" + local.slice(-2) + domain;
 }
 
 /* ---------------------------------------------------------------- 访问记录 */
