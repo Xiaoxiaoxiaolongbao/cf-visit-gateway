@@ -394,7 +394,7 @@ test("页面与产物不泄露密钥：只有签名，没有密钥；CSP nonce �
   assert.ok(csp.includes("default-src 'none'"));
   assert.ok(csp.includes("frame-ancestors 'none'"));
   const nonce = /'nonce-([A-Za-z0-9_-]+)'/.exec(csp)[1];
-  assert.equal(site.html.split(`nonce="${nonce}"`).length - 1, 3, "style 与两段 script 都要带 nonce");
+  assert.equal(site.html.split(`nonce="${nonce}"`).length - 1, 4, "style、pre-paint 主题脚本与两段业务脚本都要带 nonce");
   assert.equal(site.res.headers.get("referrer-policy"), "no-referrer");
 });
 
@@ -641,6 +641,41 @@ test("风采区：入口与弹窗在页面里，四张照片按原字节提供",
 
   assert.equal((await hit(env, "/gallery/7.jpg")).res.status, 404, "越界编号应 404");
   assert.equal((await hit(env, "/gallery/1.png")).res.status, 404);
+});
+
+test("配色：四套主题可选，切换按钮在右上角且默认跟随黑", async () => {
+  const env = makeEnv({ COUNTER: mockDO() });
+  const site = await openSite(env);
+  const html = site.html;
+
+  // 四套主题的 CSS 与菜单项
+  for (const name of ["graphite", "red", "avocado"]) {
+    assert.ok(html.includes(`:root[data-theme="${name}"]`), `应有 ${name} 主题变量`);
+  }
+  assert.ok(html.includes(':root, :root[data-theme="noir"]'), "黑应为默认主题");
+  const options = [...html.matchAll(/data-theme-opt="([a-z]+)"/g)].map((m) => m[1]).sort();
+  assert.deepEqual(options, ["avocado", "graphite", "noir", "red"], "菜单应有四个选项");
+
+  // 切换按钮与菜单语义
+  assert.ok(html.includes('id="theme-btn"'), "应有切换按钮");
+  assert.ok(/id="theme-btn"[^>]*aria-haspopup="true"/.test(html), "按钮应声明弹出行为");
+  assert.ok(/id="theme-menu"[^>]*hidden/.test(html), "菜单默认收起");
+
+  // 浅色主题不能残留写死的白字/黑底关键项
+  assert.ok(html.includes("var(--btn-bg)") && html.includes("var(--btn-fg)"), "按钮颜色必须走变量");
+  assert.ok(html.includes("var(--panel)") && html.includes("var(--scrim)"), "弹窗底色与遮罩必须走变量");
+  assert.ok(html.includes("var(--light)"), "主光必须走变量");
+  assert.ok(!/color: #0a0a0c/.test(html), "按钮文字色不得写死在规则里");
+  assert.ok(!/background: #08080a/.test(html), "弹窗底色不得写死在规则里");
+
+  // 首屏前应用已保存主题的脚本，必须带 nonce
+  assert.ok(/<script nonce="[^"]+">[\s\S]{0,200}vg-theme/.test(html), "应有 pre-paint 主题脚本且带 nonce");
+
+  // 右上角容器仍在
+  assert.ok(html.includes('class="corner"'));
+  const cornerIdx = html.indexOf('class="corner"');
+  const themeIdx = html.indexOf('id="theme-btn"');
+  assert.ok(themeIdx > cornerIdx, "切换按钮必须在右上角容器内");
 });
 
 /* ------------------------------------------------------------------ 运行 */
