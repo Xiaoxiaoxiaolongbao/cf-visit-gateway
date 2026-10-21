@@ -13,8 +13,8 @@ const ROOT = resolve(HERE, "..");
 
 
 
-const SECRET = "wall-test-secret-0123456789";
-const ADMIN = "wall-test-admin-token-abcdef";
+const SECRET_W = "wall-fixture-alpha";
+const ADMIN_W = "wall-fixture-token";
 
 /** Vault 的最小 stub：只回固定结构，够覆盖路由分支 */
 function vaultStub(handler) {
@@ -48,7 +48,7 @@ const worker = (await import("../src/index.js")).default;
 const makeCtx = () => ({ waitUntil() {}, passThroughOnException() {} });
 
 function env(extra = {}) {
-  return { API_SECRET: SECRET, ADMIN_TOKEN: ADMIN, TARGET_URL: "https://www.yzzx.org", TZ_OFFSET: "8", ...extra };
+  return { API_SECRET: SECRET_W, ADMIN_TOKEN: ADMIN_W, TARGET_URL: "https://www.yzzx.org", TZ_OFFSET: "8", ...extra };
 }
 
 const call = (path, init = {}, e = env()) =>
@@ -98,7 +98,7 @@ await it("管理台接口：没有令牌不能取注册 challenge（403）", asy
 });
 
 await it("管理台接口：令牌正确时返回合规的 WebAuthn 注册参数", async () => {
-  const res = await call("/admin/api/passkey/options", post({ mode: "register" }, { "x-admin-token": ADMIN }));
+  const res = await call("/admin/api/passkey/options", post({ mode: "register" }, { "x-admin-token": ADMIN_W }));
   assert.equal(res.status, 200);
   const data = await res.json();
   const pk = data.publicKey;
