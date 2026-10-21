@@ -82,10 +82,10 @@
     <div class="card" id="card-token">
       <h2>首次配置：用管理令牌引导</h2>
       <div class="row">
-        <input type="password" id="token-input" placeholder="ADMIN_TOKEN" autocomplete="off">
+        <input type="password" id="token-input" placeholder="管理令牌" autocomplete="off">
         <button class="primary" id="btn-token" type="button">验证</button>
       </div>
-      <p class="hint">令牌只用于这次引导，验证后立刻改用 passkey。它存在 Worker Secret 里（ADMIN_TOKEN）。</p>
+      <p class="hint">令牌只用于这次引导，验证后立刻改用 passkey。它存在 Worker 的 Secret 里，验证后就不再需要它。</p>
       <p class="status" id="token-status"></p>
     </div>
   </section>
