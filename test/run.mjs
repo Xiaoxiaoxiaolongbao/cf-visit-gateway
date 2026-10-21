@@ -267,9 +267,17 @@ test("公开面：只暴露 / 与 favicon，旧接口与常见探测路径一律
   const env = makeEnv({ COUNTER: mockDO() });
   const legacy = [
     "/api/visit", "/api/stats", "/api/click", "/api/reset", "/api/config",
-    "/go", "/badge.svg", "/healthz", "/health", "/admin", "/debug",
+    "/go", "/badge.svg", "/healthz", "/health", "/debug",
     "/wp-login.php", "/.env", "/robots.txt",
   ];
+
+  // /admin 现在是正式的管理页面（需鉴权），不再属于「探测路径」；
+  // 但它下面的接口在未登录时必须明确拒绝，而不是返回数据或 404。
+  const adminPage = await hit(env, "/admin");
+  assert.equal(adminPage.res.status, 200, "/admin 应可访问");
+  assert.match(adminPage.res.headers.get("x-robots-tag") || "", /noindex/);
+  assert.equal((await hit(env, "/admin/api/list")).res.status, 401, "未登录不得读取管理列表");
+  assert.equal((await hit(env, "/admin/api/session")).res.status, 200, "会话探测允许匿名");
 
   for (const path of legacy) {
     const { res } = await hit(env, path);

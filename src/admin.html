@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="noir">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="robots" content="noindex, nofollow">
+<title>管理台 · 奶蛙中学</title>
+<link rel="icon" href="/favicon.ico" sizes="any">
+<style nonce="{{NONCE}}">
+  :root {
+    --bg: #050506; --fg: #f5f5f7; --ink: #8a8a8f; --soft: #63636a;
+    --hair: rgba(255,255,255,.09); --hair2: rgba(255,255,255,.18);
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg); min-height: 100vh;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Microsoft YaHei", sans-serif;
+    font-size: 14px; line-height: 1.6; -webkit-font-smoothing: antialiased;
+  }
+  .wrap { width: min(920px, 100%); margin: 0 auto; padding: 44px 24px 80px; }
+  .kicker { font-family: var(--mono); font-size: 10px; letter-spacing: .22em; text-transform: uppercase; color: var(--soft); margin: 0 0 20px; }
+  h1 { font-size: 26px; font-weight: 500; letter-spacing: -.02em; margin: 0 0 6px; }
+  .sub { color: var(--ink); margin: 0 0 28px; font-size: 13px; }
+  .seam { height: 1px; background: linear-gradient(90deg, transparent, var(--hair2) 20%, var(--hair2) 80%, transparent); margin: 0 0 26px; }
+  .card { border: 1px solid var(--hair); border-radius: 12px; padding: 20px; margin-bottom: 18px; }
+  .card h2 { font-size: 14px; font-weight: 500; margin: 0 0 14px; letter-spacing: .01em; }
+  .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  button {
+    font: inherit; font-size: 13px; padding: 9px 18px; border-radius: 980px; cursor: pointer;
+    border: 1px solid var(--hair2); background: transparent; color: var(--fg);
+    transition: background-color .2s ease, border-color .2s ease, opacity .2s ease;
+  }
+  button:hover { background: rgba(255,255,255,.06); }
+  button.primary { background: var(--fg); color: #0a0a0c; border-color: var(--fg); }
+  button.primary:hover { background: #fff; }
+  button.danger { border-color: rgba(217,139,134,.45); color: #d98b86; }
+  button.danger:hover { background: rgba(217,139,134,.1); }
+  button:disabled { opacity: .45; cursor: default; }
+  input[type="text"], input[type="password"] {
+    font: inherit; font-size: 13px; padding: 9px 14px; border-radius: 9px; min-width: 240px;
+    border: 1px solid var(--hair2); background: rgba(255,255,255,.03); color: var(--fg);
+  }
+  input:focus { outline: 2px solid var(--hair2); outline-offset: 1px; }
+  .hint { color: var(--soft); font-size: 12px; margin: 12px 0 0; line-height: 1.8; }
+  .status { font-family: var(--mono); font-size: 11.5px; letter-spacing: .06em; margin: 14px 0 0; min-height: 18px; }
+  .status.ok { color: #3fa86a; } .status.err { color: #d98b86; } .status.warn { color: #d8bb62; }
+  .tabs { display: flex; gap: 8px; margin: 26px 0 14px; }
+  .tabs button { padding: 7px 16px; font-size: 12.5px; }
+  .tabs button[aria-selected="true"] { background: rgba(255,255,255,.09); border-color: var(--hair2); }
+  .list { list-style: none; margin: 0; padding: 0; }
+  .list li { display: flex; gap: 14px; align-items: flex-start; padding: 12px 0; border-bottom: 1px solid var(--hair); }
+  .list li:last-child { border-bottom: 0; }
+  .meta { flex: 1; min-width: 0; }
+  .meta b { font-weight: 500; word-break: break-word; }
+  .meta span { display: block; font-family: var(--mono); font-size: 10.5px; color: var(--soft); letter-spacing: .04em; margin-top: 3px; }
+  .thumb { width: 64px; height: 64px; border-radius: 8px; object-fit: cover; border: 1px solid var(--hair); flex: none; }
+  .empty { color: var(--soft); font-size: 12.5px; padding: 10px 0; }
+  .hide { display: none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="seam"></div>
+  <p class="kicker">Admin &middot; 奶蛙中学</p>
+  <h1>管理台</h1>
+  <p class="sub">用本机 passkey 登录后，可以删除弹幕、删除上传的图片。</p>
+
+  <!-- 未登录 -->
+  <section id="gate">
+    <div class="card" id="card-passkey">
+      <h2>用 passkey 登录</h2>
+      <div class="row">
+        <button class="primary" id="btn-login" type="button">这台电脑的 passkey</button>
+        <button id="btn-register" type="button">添加新的 passkey</button>
+      </div>
+      <p class="hint" id="passkey-hint">正在读取状态…</p>
+      <p class="status" id="gate-status"></p>
+    </div>
+
+    <div class="card" id="card-token">
+      <h2>首次配置：用管理令牌引导</h2>
+      <div class="row">
+        <input type="password" id="token-input" placeholder="ADMIN_TOKEN" autocomplete="off">
+        <button class="primary" id="btn-token" type="button">验证</button>
+      </div>
+      <p class="hint">令牌只用于这次引导，验证后立刻改用 passkey。它存在 Worker Secret 里（ADMIN_TOKEN）。</p>
+      <p class="status" id="token-status"></p>
+    </div>
+  </section>
+
+  <!-- 已登录 -->
+  <section id="panel" class="hide">
+    <div class="card">
+      <div class="row" style="justify-content: space-between">
+        <div>
+          <h2 style="margin: 0">已登录</h2>
+          <span class="hint" style="margin: 0" id="whoami">—</span>
+        </div>
+        <button id="btn-logout" type="button">退出</button>
+      </div>
+    </div>
+
+    <div class="tabs" role="tablist">
+      <button role="tab" aria-selected="true" data-tab="danmaku" id="tab-danmaku">弹幕</button>
+      <button role="tab" aria-selected="false" data-tab="uploads" id="tab-uploads">图片</button>
+      <button role="tab" aria-selected="false" data-tab="keys" id="tab-keys">密钥</button>
+    </div>
+
+    <div class="card">
+      <ul class="list" id="list"></ul>
+      <p class="empty hide" id="empty">这里还是空的。</p>
+      <p class="status" id="panel-status"></p>
+    </div>
+  </section>
+</div>
+
+<script nonce="{{NONCE}}">
+  "use strict";
+
+  const $ = (id) => document.getElementById(id);
+  const b64u = {
+    enc(buf) {
+      const b = new Uint8Array(buf);
+      let s = "";
+      for (let i = 0; i < b.length; i += 1) s += String.fromCharCode(b[i]);
+      return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    },
+    dec(str) {
+      const s = String(str).replace(/-/g, "+").replace(/_/g, "/");
+      const bin = atob(s + (s.length % 4 ? "=".repeat(4 - (s.length % 4)) : ""));
+      const out = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i += 1) out[i] = bin.charCodeAt(i);
+      return out;
+    },
+  };
+
+  let state = { authed: false, tokenOk: false, passkeys: [], vault: false };
+  let tab = "danmaku";
+  let cache = { danmaku: [], uploads: [] };
+
+  function say(el, text, kind) {
+    const node = $(el);
+    node.textContent = text || "";
+    node.className = "status" + (kind ? " " + kind : "");
+  }
+
+  async function api(path, options) {
+    const res = await fetch("/admin/api" + path, {
+      method: (options && options.method) || "GET",
+      headers: { "content-type": "application/json" },
+      credentials: "same-origin",
+      body: options && options.body ? JSON.stringify(options.body) : undefined,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || "HTTP " + res.status);
+    return data;
+  }
+
+  /* --------------------------------------------------- passkey */
+
+  async function refresh() {
+    try {
+      state = await api("/session");
+    } catch (err) {
+      say("gate-status", "读取失败：" + err.message, "err");
+      return;
+    }
+    $("whoami").textContent = state.authed
+      ? "已通过 passkey 验证 · 已注册 " + state.passkeys.length + " 个密钥"
+      : "—";
+
+    if (state.authed) {
+      $("gate").classList.add("hide");
+      $("panel").classList.remove("hide");
+      await loadList();
+    } else {
+      $("gate").classList.remove("hide");
+      $("panel").classList.add("hide");
+      const has = state.passkeys.length > 0;
+      $("btn-login").disabled = !has;
+      $("passkey-hint").textContent = has
+        ? "已注册 " + state.passkeys.length + " 个 passkey。点左边按钮，用 Windows Hello / 指纹解锁。"
+        : "这台电脑还没绑定 passkey：先点「添加新的 passkey」，需要先在下面输入一次管理令牌。";
+    }
+  }
+
+  function credToJSON(cred) {
+    const r = cred.response;
+    const out = { id: cred.id, rawId: b64u.enc(cred.rawId), type: cred.type };
+    if (r.attestationObject) {
+      out.response = {
+        clientDataJSON: b64u.enc(r.clientDataJSON),
+        attestationObject: b64u.enc(r.attestationObject),
+      };
+      if (r.getTransports) out.transports = r.getTransports();
+    } else {
+      out.response = {
+        clientDataJSON: b64u.enc(r.clientDataJSON),
+        authenticatorData: b64u.enc(r.authenticatorData),
+        signature: b64u.enc(r.signature),
+        userHandle: r.userHandle ? b64u.enc(r.userHandle) : null,
+      };
+    }
+    return out;
+  }
+
+  async function register() {
+    say("gate-status", "正在请求系统验证…", "warn");
+    try {
+      const opts = await api("/passkey/options", { method: "POST", body: { mode: "register" } });
+      const pk = opts.publicKey;
+      pk.challenge = b64u.dec(pk.challenge);
+      pk.user.id = b64u.dec(pk.user.id);
+      const cred = await navigator.credentials.create({ publicKey: pk });
+      if (!cred) throw new Error("系统没有返回凭据");
+      await api("/passkey/register", {
+        method: "POST",
+        body: { response: credToJSON(cred).response, name: navigator.userAgent.slice(0, 40) },
+      });
+      say("gate-status", "passkey 已绑定，这台电脑以后可以直接登录", "ok");
+      await refresh();
+    } catch (err) {
+      say("gate-status", "注册失败：" + (err.message || err), "err");
+    }
+  }
+
+  async function login() {
+    say("gate-status", "正在请求系统验证…", "warn");
+    try {
+      const opts = await api("/passkey/options", { method: "POST", body: { mode: "login" } });
+      const pk = opts.publicKey;
+      pk.challenge = b64u.dec(pk.challenge);
+      pk.allowCredentials = (pk.allowCredentials || []).map((c) => ({ ...c, id: b64u.dec(c.id) }));
+      const cred = await navigator.credentials.get({ publicKey: pk });
+      if (!cred) throw new Error("系统没有返回凭据");
+      await api("/passkey/login", { method: "POST", body: { id: cred.id, response: credToJSON(cred).response } });
+      say("gate-status", "", "");
+      await refresh();
+    } catch (err) {
+      say("gate-status", "登录失败：" + (err.message || err), "err");
+    }
+  }
+
+  async function tokenLogin() {
+    const token = $("token-input").value.trim();
+    if (!token) return say("token-status", "请先填入令牌", "warn");
+    try {
+      await api("/token", { method: "POST", body: { token } });
+      say("token-status", "验证通过，现在可以添加 passkey", "ok");
+      await refresh();
+    } catch (err) {
+      say("token-status", "验证失败：" + (err.message || err), "err");
+    }
+  }
+
+  /* --------------------------------------------------- 列表 */
+
+  async function loadList() {
+    try {
+      const data = await api("/list");
+      cache = { danmaku: data.danmaku || [], uploads: data.uploads || [] };
+      render();
+    } catch (err) {
+      say("panel-status", "读取失败：" + err.message, "err");
+    }
+  }
+
+  function render() {
+    const list = $("list");
+    list.innerHTML = "";
+    let items = [];
+
+    if (tab === "danmaku") {
+      items = cache.danmaku.map((d) => ({ kind: "danmaku", id: d.id, title: d.text, meta: `${d.color} · ${d.size}px · ${when(d.created)}` }));
+    } else if (tab === "uploads") {
+      items = cache.uploads.map((u) => ({ kind: "upload", id: u.id, title: u.title || u.id, meta: `${u.mime} · ${(u.bytes / 1024).toFixed(1)} KB · ${when(u.created)}`, thumb: "/img/" + u.id }));
+    } else {
+      items = state.passkeys.map((k) => ({ kind: "passkey", id: k.id, title: k.name || k.id.slice(0, 12), meta: "注册于 " + when(k.created) }));
+    }
+
+    $("empty").classList.toggle("hide", items.length > 0);
+
+    for (const item of items) {
+      const li = document.createElement("li");
+      if (item.thumb) {
+        const img = document.createElement("img");
+        img.className = "thumb";
+        img.src = item.thumb;
+        img.alt = "";
+        img.loading = "lazy";
+        li.appendChild(img);
+      }
+      const meta = document.createElement("div");
+      meta.className = "meta";
+      const b = document.createElement("b");
+      b.textContent = item.title;
+      const sp = document.createElement("span");
+      sp.textContent = item.meta;
+      meta.append(b, sp);
+      li.appendChild(meta);
+
+      const del = document.createElement("button");
+      del.type = "button";
+      del.className = "danger";
+      del.textContent = "删除";
+      del.addEventListener("click", async () => {
+        del.disabled = true;
+        try {
+          if (item.kind === "passkey") await api("/passkey/remove", { method: "POST", body: { id: item.id } });
+          else await api("/delete", { method: "POST", body: { kind: item.kind, id: item.id } });
+          say("panel-status", "已删除", "ok");
+          await refresh();
+        } catch (err) {
+          say("panel-status", "删除失败：" + err.message, "err");
+          del.disabled = false;
+        }
+      });
+      li.appendChild(del);
+      list.appendChild(li);
+    }
+  }
+
+  function when(ts) {
+    if (!ts) return "—";
+    const d = new Date(ts);
+    return d.toLocaleString("zh-CN", { hour12: false });
+  }
+
+  /* --------------------------------------------------- 事件 */
+
+  $("btn-login").addEventListener("click", login);
+  $("btn-register").addEventListener("click", register);
+  $("btn-token").addEventListener("click", tokenLogin);
+  $("btn-logout").addEventListener("click", async () => {
+    await api("/logout", { method: "POST" }).catch(() => {});
+    await refresh();
+  });
+
+  for (const btn of document.querySelectorAll("[data-tab]")) {
+    btn.addEventListener("click", () => {
+      tab = btn.dataset.tab;
+      for (const other of document.querySelectorAll("[data-tab]")) {
+        other.setAttribute("aria-selected", String(other === btn));
+      }
+      render();
+    });
+  }
+
+  refresh();
+</script>
+</body>
+</html>

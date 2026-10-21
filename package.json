@@ -17,7 +17,7 @@
     "start": "wrangler dev",
     "deploy": "wrangler deploy",
     "check": "wrangler deploy --dry-run --outdir=dist",
-    "test": "node test/run.mjs",
+    "test": "node test/run.mjs && node test/wall.mjs",
     "audit": "node scripts/audit-secrets.mjs",
     "paths": "node scripts/paths.mjs",
     "doctor": "node scripts/doctor.mjs",

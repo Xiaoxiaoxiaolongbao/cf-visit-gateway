@@ -78,17 +78,26 @@ MAIL_DASH_URL = "https://dash.cloudflare.com/05389e0b486b83cef368ded14cf44c21/xn
 name = "COUNTER"
 class_name = "Counter"
 
+[[durable_objects.bindings]]
+name = "VAULT"
+class_name = "Vault"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["Counter"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["Vault"]
 
 # ---------------------------------------------------------------------------
 # KV 回退（可选）：`wrangler kv namespace create VISITS` 后取消注释并填 id。
 # 仅在未绑定 COUNTER 时生效，用于无法配置 Durable Object 的场景（近似统计）。
 # ---------------------------------------------------------------------------
-# [[kv_namespaces]]
-# binding = "VISITS"
-# id = "REPLACE_WITH_KV_NAMESPACE_ID"
+# 图片字节存这里（单值上限 25MB，足够放 10MB 的图）
+[[kv_namespaces]]
+binding = "UPLOADS"
+id = "f87d80ea1ea14a379d2dc549fe945e22"
 
 # ---------------------------------------------------------------------------
 # 静态资源：.html 作为文本模块、.jpg 作为二进制模块打包，Worker 内 import 即可使用
