@@ -99,7 +99,7 @@
           <input type="password" id="token-input" placeholder="管理令牌" autocomplete="off">
           <button class="primary" id="btn-token" type="button">验证令牌</button>
         </div>
-        <p class="hint" id="step1-hint">令牌在项目的 .dev.vars 里（ADMIN_TOKEN），也等于 Worker 上的同名 Secret。只用于这次绑定。</p>
+        <p class="hint" id="step1-hint">令牌在项目根目录的 .dev.vars 文件里，也等于 Worker 上配置的那个同名 Secret。只用于这次绑定。</p>
       </li>
       <li id="step2">
         <b>第 2 步 · 添加这台电脑的 passkey</b>
@@ -211,7 +211,7 @@
     $("token-row").classList.toggle("hide", state.authed);
     $("step1-hint").textContent = state.authed
       ? "令牌已验证 ✓"
-      : "令牌在项目的 .dev.vars 里（ADMIN_TOKEN），也等于 Worker 上的同名 Secret。只用于这次绑定。";
+      : "令牌在项目根目录的 .dev.vars 文件里，也等于 Worker 上配置的那个同名 Secret。只用于这次绑定。";
 
     const step2 = $("step2");
     step2.classList.toggle("done", hasKey);
