@@ -14,6 +14,7 @@ import { b64uEncode, b64uDecode, verifyRegistration, verifyAssertion } from "./w
 const MAX_UPLOAD = 10 * 1024 * 1024;
 const SESSION_TTL = 12 * 3600 * 1000;
 const CHALLENGE_TTL = 5 * 60 * 1000;
+const BOOTSTRAP_TTL = 30 * 60 * 1000;
 
 const json = (body, status = 200, headers = {}) =>
   new Response(JSON.stringify(body), {
@@ -261,8 +262,11 @@ export async function handleAdminApi(request, env, url, cfg) {
       authed,
       tokenOk,
       rpId,
+      host: url.hostname,
+      origin,
       passkeys: passkeys.items || [],
       vault: Boolean(vault(env)),
+      uploads: Boolean(env.UPLOADS),
     });
   }
 
@@ -290,7 +294,11 @@ export async function handleAdminApi(request, env, url, cfg) {
             ],
             timeout: 60000,
             attestation: "none",
-            authenticatorSelection: { residentKey: "preferred", userVerification: "preferred" },
+            authenticatorSelection: {
+              authenticatorAttachment: "platform",
+              residentKey: "preferred",
+              userVerification: "required",
+            },
           },
         },
         200,
@@ -299,6 +307,9 @@ export async function handleAdminApi(request, env, url, cfg) {
     }
 
     const list = (await vaultCall(env, "/passkeys")) || { items: [] };
+    if (!(list.items || []).length) {
+      return json({ error: "这台电脑还没有绑定的 passkey，请先完成第 2 步绑定" }, 409);
+    }
     return json(
       {
         publicKey: {
@@ -328,13 +339,14 @@ export async function handleAdminApi(request, env, url, cfg) {
         origin,
         rpId,
       });
-      await vaultPost(env, "/passkey", {
+      const stored = await vaultPost(env, "/passkey", {
         id: reg.credentialId,
         jwk: reg.jwk,
         alg: reg.alg,
         signCount: reg.signCount,
         name: String(body.name || "").slice(0, 40),
       });
+      if (!stored || !stored.ok) return json({ error: "保存凭据失败：Vault 未就绪" }, 500);
       const sess = await sign(cfg.apiSecret, { role: "admin", exp: Date.now() + SESSION_TTL });
       return json({ ok: true, credentialId: reg.credentialId }, 200, {
         "set-cookie": setCookie("vw-sess", sess, SESSION_TTL),
@@ -377,8 +389,8 @@ export async function handleAdminApi(request, env, url, cfg) {
     const body = await request.json().catch(() => ({}));
     const token = String(body.token || "");
     if (!cfg.adminToken || token !== cfg.adminToken) return json({ error: "令牌不正确" }, 403);
-    const sess = await sign(cfg.apiSecret, { role: "admin", exp: Date.now() + CHALLENGE_TTL });
-    return json({ ok: true }, 200, { "set-cookie": setCookie("vw-sess", sess, CHALLENGE_TTL) });
+    const sess = await sign(cfg.apiSecret, { role: "admin", exp: Date.now() + BOOTSTRAP_TTL });
+    return json({ ok: true, ttl: BOOTSTRAP_TTL }, 200, { "set-cookie": setCookie("vw-sess", sess, BOOTSTRAP_TTL) });
   }
 
   /* --- 以下要求已登录（passkey 会话，或管理令牌） --- */

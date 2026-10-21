@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN" data-theme="noir">
+<html lang="zh-CN">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -11,42 +11,62 @@
   :root {
     --bg: #050506; --fg: #f5f5f7; --ink: #8a8a8f; --soft: #63636a;
     --hair: rgba(255,255,255,.09); --hair2: rgba(255,255,255,.18);
+    --ok: #3fa86a; --warn: #d8bb62; --err: #d98b86;
     --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   }
   *, *::before, *::after { box-sizing: border-box; }
   body {
     margin: 0; background: var(--bg); color: var(--fg); min-height: 100vh;
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Microsoft YaHei", sans-serif;
-    font-size: 14px; line-height: 1.6; -webkit-font-smoothing: antialiased;
+    font-size: 14px; line-height: 1.65; -webkit-font-smoothing: antialiased;
   }
-  .wrap { width: min(920px, 100%); margin: 0 auto; padding: 44px 24px 80px; }
-  .kicker { font-family: var(--mono); font-size: 10px; letter-spacing: .22em; text-transform: uppercase; color: var(--soft); margin: 0 0 20px; }
-  h1 { font-size: 26px; font-weight: 500; letter-spacing: -.02em; margin: 0 0 6px; }
-  .sub { color: var(--ink); margin: 0 0 28px; font-size: 13px; }
+  .wrap { width: min(880px, 100%); margin: 0 auto; padding: 44px 24px 90px; }
   .seam { height: 1px; background: linear-gradient(90deg, transparent, var(--hair2) 20%, var(--hair2) 80%, transparent); margin: 0 0 26px; }
-  .card { border: 1px solid var(--hair); border-radius: 12px; padding: 20px; margin-bottom: 18px; }
-  .card h2 { font-size: 14px; font-weight: 500; margin: 0 0 14px; letter-spacing: .01em; }
+  .kicker { font-family: var(--mono); font-size: 10px; letter-spacing: .22em; text-transform: uppercase; color: var(--soft); margin: 0 0 18px; }
+  h1 { font-size: 26px; font-weight: 500; letter-spacing: -.02em; margin: 0 0 6px; }
+  .sub { color: var(--ink); margin: 0 0 26px; font-size: 13px; }
+  .card { border: 1px solid var(--hair); border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+  .card h2 { font-size: 14px; font-weight: 500; margin: 0 0 14px; }
+
+  /* 三步向导 */
+  .steps { list-style: none; margin: 0; padding: 0; counter-reset: step; }
+  .steps li { position: relative; padding: 14px 0 14px 42px; border-bottom: 1px solid var(--hair); }
+  .steps li:last-child { border-bottom: 0; padding-bottom: 0; }
+  .steps li::before {
+    counter-increment: step; content: counter(step);
+    position: absolute; left: 0; top: 14px; width: 26px; height: 26px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--mono); font-size: 11px; color: var(--soft);
+    border: 1px solid var(--hair2);
+  }
+  .steps li.done::before { content: "✓"; color: var(--ok); border-color: rgba(63,168,106,.5); }
+  .steps li.active::before { color: var(--fg); border-color: var(--fg); }
+  .steps b { display: block; font-weight: 500; font-size: 13.5px; margin-bottom: 8px; }
+  .steps .hint { color: var(--soft); font-size: 12px; margin: 6px 0 0; }
   .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
   button {
     font: inherit; font-size: 13px; padding: 9px 18px; border-radius: 980px; cursor: pointer;
     border: 1px solid var(--hair2); background: transparent; color: var(--fg);
     transition: background-color .2s ease, border-color .2s ease, opacity .2s ease;
   }
-  button:hover { background: rgba(255,255,255,.06); }
+  button:hover:not(:disabled) { background: rgba(255,255,255,.06); }
   button.primary { background: var(--fg); color: #0a0a0c; border-color: var(--fg); }
-  button.primary:hover { background: #fff; }
-  button.danger { border-color: rgba(217,139,134,.45); color: #d98b86; }
-  button.danger:hover { background: rgba(217,139,134,.1); }
-  button:disabled { opacity: .45; cursor: default; }
+  button.primary:hover:not(:disabled) { background: #fff; }
+  button.danger { border-color: rgba(217,139,134,.45); color: var(--err); }
+  button.danger:hover:not(:disabled) { background: rgba(217,139,134,.1); }
+  button:disabled { opacity: .4; cursor: not-allowed; }
   input[type="text"], input[type="password"] {
-    font: inherit; font-size: 13px; padding: 9px 14px; border-radius: 9px; min-width: 240px;
+    font: inherit; font-size: 13px; padding: 9px 14px; border-radius: 9px; min-width: 250px;
     border: 1px solid var(--hair2); background: rgba(255,255,255,.03); color: var(--fg);
   }
   input:focus { outline: 2px solid var(--hair2); outline-offset: 1px; }
-  .hint { color: var(--soft); font-size: 12px; margin: 12px 0 0; line-height: 1.8; }
-  .status { font-family: var(--mono); font-size: 11.5px; letter-spacing: .06em; margin: 14px 0 0; min-height: 18px; }
-  .status.ok { color: #3fa86a; } .status.err { color: #d98b86; } .status.warn { color: #d8bb62; }
-  .tabs { display: flex; gap: 8px; margin: 26px 0 14px; }
+  .status { font-family: var(--mono); font-size: 11.5px; letter-spacing: .04em; margin: 14px 0 0; min-height: 18px; }
+  .status.ok { color: var(--ok); } .status.warn { color: var(--warn); } .status.err { color: var(--err); }
+  .warnbar {
+    border: 1px solid rgba(216,187,98,.35); background: rgba(216,187,98,.06); color: var(--warn);
+    border-radius: 10px; padding: 12px 14px; font-size: 12.5px; margin-bottom: 16px;
+  }
+  .tabs { display: flex; gap: 8px; margin: 0 0 14px; flex-wrap: wrap; align-items: center; }
   .tabs button { padding: 7px 16px; font-size: 12.5px; }
   .tabs button[aria-selected="true"] { background: rgba(255,255,255,.09); border-color: var(--hair2); }
   .list { list-style: none; margin: 0; padding: 0; }
@@ -58,6 +78,7 @@
   .thumb { width: 64px; height: 64px; border-radius: 8px; object-fit: cover; border: 1px solid var(--hair); flex: none; }
   .empty { color: var(--soft); font-size: 12.5px; padding: 10px 0; }
   .hide { display: none !important; }
+  .domain { font-family: var(--mono); font-size: 11.5px; color: var(--fg); }
 </style>
 </head>
 <body>
@@ -65,49 +86,44 @@
   <div class="seam"></div>
   <p class="kicker">Admin &middot; 奶蛙中学</p>
   <h1>管理台</h1>
-  <p class="sub">用本机 passkey 登录后，可以删除弹幕、删除上传的图片。</p>
+  <p class="sub">按顺序做完两步，这台电脑就能用 passkey 一键进管理台。</p>
 
-  <!-- 未登录 -->
-  <section id="gate">
-    <div class="card" id="card-passkey">
-      <h2>用 passkey 登录</h2>
-      <div class="row">
-        <button class="primary" id="btn-login" type="button">这台电脑的 passkey</button>
-        <button id="btn-register" type="button">添加新的 passkey</button>
-      </div>
-      <p class="hint" id="passkey-hint">正在读取状态…</p>
-      <p class="status" id="gate-status"></p>
-    </div>
+  <div id="warnbar" class="warnbar hide"></div>
 
-    <div class="card" id="card-token">
-      <h2>首次配置：用管理令牌引导</h2>
-      <div class="row">
-        <input type="password" id="token-input" placeholder="管理令牌" autocomplete="off">
-        <button class="primary" id="btn-token" type="button">验证</button>
-      </div>
-      <p class="hint">令牌只用于这次引导，验证后立刻改用 passkey。它存在 Worker 的 Secret 里，验证后就不再需要它。</p>
-      <p class="status" id="token-status"></p>
-    </div>
+  <section class="card" id="bind-card">
+    <h2>绑定这台电脑</h2>
+    <ol class="steps">
+      <li id="step1" class="active">
+        <b>第 1 步 · 输入一次管理令牌</b>
+        <div class="row" id="token-row">
+          <input type="password" id="token-input" placeholder="管理令牌" autocomplete="off">
+          <button class="primary" id="btn-token" type="button">验证令牌</button>
+        </div>
+        <p class="hint" id="step1-hint">令牌在项目的 .dev.vars 里（ADMIN_TOKEN），也等于 Worker 上的同名 Secret。只用于这次绑定。</p>
+      </li>
+      <li id="step2">
+        <b>第 2 步 · 添加这台电脑的 passkey</b>
+        <div class="row">
+          <button class="primary" id="btn-register" type="button" disabled>添加这台电脑的 passkey</button>
+          <button id="btn-login" type="button" class="hide">用已有的 passkey 登录</button>
+        </div>
+        <p class="hint" id="step2-hint">先完成第 1 步（输入令牌）才能绑定。</p>
+      </li>
+      <li id="step3">
+        <b>第 3 步 · 完成</b>
+        <p class="hint" id="step3-hint">绑好后，以后打开这个页面点一下就能进。</p>
+      </li>
+    </ol>
+    <p class="status" id="bind-status"></p>
   </section>
 
-  <!-- 已登录 -->
-  <section id="panel" class="hide">
-    <div class="card">
-      <div class="row" style="justify-content: space-between">
-        <div>
-          <h2 style="margin: 0">已登录</h2>
-          <span class="hint" style="margin: 0" id="whoami">—</span>
-        </div>
-        <button id="btn-logout" type="button">退出</button>
-      </div>
-    </div>
-
+  <section id="manage" class="hide">
     <div class="tabs" role="tablist">
-      <button role="tab" aria-selected="true" data-tab="danmaku" id="tab-danmaku">弹幕</button>
-      <button role="tab" aria-selected="false" data-tab="uploads" id="tab-uploads">图片</button>
-      <button role="tab" aria-selected="false" data-tab="keys" id="tab-keys">密钥</button>
+      <button role="tab" aria-selected="true" data-tab="danmaku">弹幕</button>
+      <button role="tab" aria-selected="false" data-tab="uploads">图片</button>
+      <button role="tab" aria-selected="false" data-tab="keys">密钥</button>
+      <button id="btn-logout" type="button" style="margin-left:auto">退出</button>
     </div>
-
     <div class="card">
       <ul class="list" id="list"></ul>
       <p class="empty hide" id="empty">这里还是空的。</p>
@@ -136,14 +152,32 @@
     },
   };
 
-  let state = { authed: false, tokenOk: false, passkeys: [], vault: false };
+  let state = { authed: false, passkeys: [], rpId: "", vault: false, uploads: false };
   let tab = "danmaku";
   let cache = { danmaku: [], uploads: [] };
 
-  function say(el, text, kind) {
-    const node = $(el);
-    node.textContent = text || "";
-    node.className = "status" + (kind ? " " + kind : "");
+  function say(id, text, kind) {
+    const el = $(id);
+    el.textContent = text || "";
+    el.className = "status" + (kind ? " " + kind : "");
+  }
+
+  function explain(err) {
+    const name = (err && err.name) || "";
+    if (name === "NotAllowedError") {
+      return "系统窗口被取消或超时了。再点一次；如果一直不弹出，先确认这台电脑设置过 Windows Hello（PIN / 指纹 / 人脸）。";
+    }
+    if (name === "SecurityError") {
+      return "域名不匹配：passkey 只能绑定当前域名（" + state.rpId + "）。别用 IP 或 *.workers.dev 地址访问。";
+    }
+    if (name === "InvalidStateError") {
+      return "这台设备已经注册过 passkey 了，直接点「用已有的 passkey 登录」。";
+    }
+    if (name === "NotSupportedError" || name === "ConstraintError") {
+      return "当前浏览器或系统不支持 passkey（需要 Windows Hello、Touch ID 或安全密钥）。";
+    }
+    if (name === "AbortError") return "操作被中断，重试一次。";
+    return (err && err.message) || String(err);
   }
 
   async function api(path, options) {
@@ -158,43 +192,64 @@
     return data;
   }
 
-  /* --------------------------------------------------- passkey */
-
   async function refresh() {
     try {
       state = await api("/session");
     } catch (err) {
-      say("gate-status", "读取失败：" + err.message, "err");
+      say("bind-status", "读取状态失败：" + explain(err), "err");
       return;
     }
-    $("whoami").textContent = state.authed
-      ? "已通过 passkey 验证 · 已注册 " + state.passkeys.length + " 个密钥"
-      : "—";
 
-    if (state.authed) {
-      $("gate").classList.add("hide");
-      $("panel").classList.remove("hide");
-      await loadList();
+    const hasKey = state.passkeys.length > 0;
+    $("domain-label") && ($("domain-label").textContent = state.rpId || location.hostname);
+
+    $("bind-card").classList.toggle("hide", state.authed && hasKey);
+
+    const step1 = $("step1");
+    step1.classList.toggle("done", state.authed);
+    step1.classList.toggle("active", !state.authed);
+    $("token-row").classList.toggle("hide", state.authed);
+    $("step1-hint").textContent = state.authed
+      ? "令牌已验证 ✓"
+      : "令牌在项目的 .dev.vars 里（ADMIN_TOKEN），也等于 Worker 上的同名 Secret。只用于这次绑定。";
+
+    const step2 = $("step2");
+    step2.classList.toggle("done", hasKey);
+    step2.classList.toggle("active", state.authed && !hasKey);
+    $("btn-register").disabled = !state.authed;
+    $("btn-register").textContent = hasKey ? "再添加一个 passkey" : "添加这台电脑的 passkey";
+    $("btn-login").classList.toggle("hide", !hasKey || state.authed);
+    if (!state.authed) {
+      $("step2-hint").textContent = "先完成第 1 步（输入令牌）才能绑定。";
+    } else if (hasKey) {
+      $("step2-hint").textContent = "已绑定 " + state.passkeys.length + " 个（域名 " + state.rpId + "），可以再给另一台设备绑一个。";
     } else {
-      $("gate").classList.remove("hide");
-      $("panel").classList.add("hide");
-      const has = state.passkeys.length > 0;
-      $("btn-login").disabled = !has;
-      $("passkey-hint").textContent = has
-        ? "已注册 " + state.passkeys.length + " 个 passkey。点左边按钮，用 Windows Hello / 指纹解锁。"
-        : "这台电脑还没绑定 passkey：先点「添加新的 passkey」，需要先在下面输入一次管理令牌。";
+      $("step2-hint").textContent = "现在可以绑定了。点按钮后系统会弹 Windows Hello / 指纹窗口，确认一次即可。绑定域名：" + state.rpId + "。";
     }
+
+    $("step3").classList.toggle("done", hasKey);
+    $("step3-hint").textContent = hasKey
+      ? "完成。以后打开这个页面点「用已有的 passkey 登录」即可，不再需要令牌。"
+      : "绑好后，以后打开这个页面点一下就能进。";
+
+    $("manage").classList.toggle("hide", !state.authed);
+
+    const warnings = [];
+    if (state.authed && !hasKey) warnings.push("这台电脑还没绑定 passkey（第 2 步）：当前只是令牌的临时会话，30 分钟内有效，建议顺手绑一下。");
+    if (state.vault === false) warnings.push("Vault 未绑定：弹幕与图片的增删不会落库，检查 wrangler.toml 的 VAULT 绑定。");
+    if (state.uploads === false) warnings.push("UPLOADS 未绑定：图片无法保存，检查 KV 绑定。");
+    const bar = $("warnbar");
+    bar.classList.toggle("hide", warnings.length === 0);
+    bar.textContent = warnings.join(" ");
+
+    if (state.authed) await loadList();
   }
 
   function credToJSON(cred) {
     const r = cred.response;
-    const out = { id: cred.id, rawId: b64u.enc(cred.rawId), type: cred.type };
+    const out = { id: cred.id };
     if (r.attestationObject) {
-      out.response = {
-        clientDataJSON: b64u.enc(r.clientDataJSON),
-        attestationObject: b64u.enc(r.attestationObject),
-      };
-      if (r.getTransports) out.transports = r.getTransports();
+      out.response = { clientDataJSON: b64u.enc(r.clientDataJSON), attestationObject: b64u.enc(r.attestationObject) };
     } else {
       out.response = {
         clientDataJSON: b64u.enc(r.clientDataJSON),
@@ -207,7 +262,12 @@
   }
 
   async function register() {
-    say("gate-status", "正在请求系统验证…", "warn");
+    if (!window.PublicKeyCredential) {
+      say("bind-status", "这个浏览器不支持 passkey（需要较新的 Chrome / Edge / Safari）。", "err");
+      return;
+    }
+    say("bind-status", "正在请求系统验证…", "warn");
+    $("btn-register").disabled = true;
     try {
       const opts = await api("/passkey/options", { method: "POST", body: { mode: "register" } });
       const pk = opts.publicKey;
@@ -219,15 +279,16 @@
         method: "POST",
         body: { response: credToJSON(cred).response, name: navigator.userAgent.slice(0, 40) },
       });
-      say("gate-status", "passkey 已绑定，这台电脑以后可以直接登录", "ok");
+      say("bind-status", "绑定成功 ✓ 这台电脑以后可以直接登录", "ok");
       await refresh();
     } catch (err) {
-      say("gate-status", "注册失败：" + (err.message || err), "err");
+      say("bind-status", "绑定失败：" + explain(err), "err");
+      $("btn-register").disabled = false;
     }
   }
 
   async function login() {
-    say("gate-status", "正在请求系统验证…", "warn");
+    say("bind-status", "正在请求系统验证…", "warn");
     try {
       const opts = await api("/passkey/options", { method: "POST", body: { mode: "login" } });
       const pk = opts.publicKey;
@@ -236,26 +297,26 @@
       const cred = await navigator.credentials.get({ publicKey: pk });
       if (!cred) throw new Error("系统没有返回凭据");
       await api("/passkey/login", { method: "POST", body: { id: cred.id, response: credToJSON(cred).response } });
-      say("gate-status", "", "");
+      say("bind-status", "登录成功 ✓", "ok");
       await refresh();
     } catch (err) {
-      say("gate-status", "登录失败：" + (err.message || err), "err");
+      say("bind-status", "登录失败：" + explain(err), "err");
     }
   }
 
   async function tokenLogin() {
     const token = $("token-input").value.trim();
-    if (!token) return say("token-status", "请先填入令牌", "warn");
+    if (!token) return say("bind-status", "请先填入令牌", "warn");
+    say("bind-status", "正在验证令牌…", "warn");
     try {
       await api("/token", { method: "POST", body: { token } });
-      say("token-status", "验证通过，现在可以添加 passkey", "ok");
+      $("token-input").value = "";
+      say("bind-status", "令牌通过 ✓ 现在做第 2 步：点「添加这台电脑的 passkey」", "ok");
       await refresh();
     } catch (err) {
-      say("token-status", "验证失败：" + (err.message || err), "err");
+      say("bind-status", "令牌验证失败：" + explain(err), "err");
     }
   }
-
-  /* --------------------------------------------------- 列表 */
 
   async function loadList() {
     try {
@@ -263,8 +324,12 @@
       cache = { danmaku: data.danmaku || [], uploads: data.uploads || [] };
       render();
     } catch (err) {
-      say("panel-status", "读取失败：" + err.message, "err");
+      say("panel-status", "读取失败：" + explain(err), "err");
     }
+  }
+
+  function when(ts) {
+    return ts ? new Date(ts).toLocaleString("zh-CN", { hour12: false }) : "—";
   }
 
   function render() {
@@ -273,9 +338,9 @@
     let items = [];
 
     if (tab === "danmaku") {
-      items = cache.danmaku.map((d) => ({ kind: "danmaku", id: d.id, title: d.text, meta: `${d.color} · ${d.size}px · ${when(d.created)}` }));
+      items = cache.danmaku.map((d) => ({ kind: "danmaku", id: d.id, title: d.text, meta: d.color + " · " + d.size + "px · " + when(d.created) }));
     } else if (tab === "uploads") {
-      items = cache.uploads.map((u) => ({ kind: "upload", id: u.id, title: u.title || u.id, meta: `${u.mime} · ${(u.bytes / 1024).toFixed(1)} KB · ${when(u.created)}`, thumb: "/img/" + u.id }));
+      items = cache.uploads.map((u) => ({ kind: "upload", id: u.id, title: u.title || u.id, meta: u.mime + " · " + (u.bytes / 1024).toFixed(1) + " KB · " + when(u.created), thumb: "/img/" + u.id }));
     } else {
       items = state.passkeys.map((k) => ({ kind: "passkey", id: k.id, title: k.name || k.id.slice(0, 12), meta: "注册于 " + when(k.created) }));
     }
@@ -313,7 +378,7 @@
           say("panel-status", "已删除", "ok");
           await refresh();
         } catch (err) {
-          say("panel-status", "删除失败：" + err.message, "err");
+          say("panel-status", "删除失败：" + explain(err), "err");
           del.disabled = false;
         }
       });
@@ -322,17 +387,10 @@
     }
   }
 
-  function when(ts) {
-    if (!ts) return "—";
-    const d = new Date(ts);
-    return d.toLocaleString("zh-CN", { hour12: false });
-  }
-
-  /* --------------------------------------------------- 事件 */
-
-  $("btn-login").addEventListener("click", login);
-  $("btn-register").addEventListener("click", register);
   $("btn-token").addEventListener("click", tokenLogin);
+  $("token-input").addEventListener("keydown", (e) => { if (e.key === "Enter") tokenLogin(); });
+  $("btn-register").addEventListener("click", register);
+  $("btn-login").addEventListener("click", login);
   $("btn-logout").addEventListener("click", async () => {
     await api("/logout", { method: "POST" }).catch(() => {});
     await refresh();
