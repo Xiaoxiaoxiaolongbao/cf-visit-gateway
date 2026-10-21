@@ -121,6 +121,11 @@ npm run build:single
 | `/{prefix}/b` | GET | 仅前缀 | 徽章（需 `ENABLE_BADGE=true`） |
 | `/{prefix}/r` | POST | 前缀 + 令牌 | 清零统计，需 `x-admin-token` |
 | `/{prefix}/h` | GET | 前缀 + 令牌 | 运维自检 + **完整计数**（总访问 / 今日 / 跳转 / 独立访客） |
+| `/admin` | GET | 公开（页面本身） | 管理台：passkey 登录后删除弹幕与图片，接口在 `/admin/api/*` 且需鉴权 |
+| `/api/wall` | GET | 公开 | 读取留言与图片列表（只返回已发布内容） |
+| `/api/wall/danmaku` | POST | 公开 | 发弹幕：≤60 字、颜色 `#rrggbb`、字号 12–28；同一来源 60 秒最多 3 条 |
+| `/api/wall/upload` | POST | 公开 | 传图：≤10MB，按魔数只收 JPG/PNG/GIF/WebP；同一来源每小时最多 8 张 |
+| `/img/<id>` | GET | 公开 | 取上传的图片（字节存 KV，长缓存 immutable） |
 | 其它任何路径 | — | — | 空 404 |
 
 浏览器能拿到的只有位次（`/{prefix}/v` 与 `/{prefix}/s` 的响应）：
@@ -330,6 +335,14 @@ cp .dev.vars.example .dev.vars     # 然后填入两个随机串
 **并发高时会丢计数吗？** `durable` 模式不会（所有请求进同一 DO 实例串行处理）。`kv` 回退模式是读-改-写，高并发下会漂移。
 
 本项目与扬州中学官方无关
+## 留言墙 / 上传 / 管理台
+
+- 弹幕浮在头像圆框内（`prefers-reduced-motion` 下不播放），颜色和字号由访客自选
+- 图片字节存 KV（绑定 `UPLOADS`，单值上限 25MB）；弹幕、图片元信息、passkey 凭据存在 `Vault` 这个 SQLite Durable Object 里
+- 管理靠 **passkey（WebAuthn）**：服务端自己校验 challenge、rpIdHash 与签名，见 `src/webauthn.js`（含 DER→raw 与 CBOR 解析）
+- 首次使用：打开 `/admin` → 填一次 `ADMIN_TOKEN` → 点「添加新的 passkey」→ 用 Windows Hello / 指纹确认。之后同一台电脑直接点即可，不再需要令牌
+- passkey 与域名绑定：换域名（例如 `heyiwei.asia`）需要在那个域名下另绑一次
+
 ## License
 
 [MIT](./LICENSE)

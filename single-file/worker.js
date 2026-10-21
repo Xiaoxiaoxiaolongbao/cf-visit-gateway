@@ -308,6 +308,79 @@ var page_default = `<!DOCTYPE html>
   .corner svg { display: block; width: 15px; height: 15px; }
 
 
+
+  /* 弹幕层：只浮在头像圆框内，不挡点击 */
+  .danmaku-layer {
+    position: absolute; inset: 0; z-index: 4; overflow: hidden; border-radius: 50%;
+    pointer-events: none;
+  }
+  .danmaku-layer span {
+    position: absolute; left: 0; top: 0; white-space: nowrap; will-change: transform;
+    font-weight: 500; letter-spacing: .01em;
+    animation-name: dmFloat; animation-timing-function: linear; animation-fill-mode: forwards;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, .6), 0 0 1px rgba(0, 0, 0, .8);
+  }
+  @keyframes dmFloat {
+    from { transform: translateX(var(--dm-from, 0)) }
+    to { transform: translateX(var(--dm-to, -800px)) }
+  }
+
+  /* 发送器：细线一行，克制 */
+  .dm-composer {
+    display: flex; align-items: center; gap: 10px; margin: 26px 0 0;
+    padding: 10px 12px; border: 1px solid var(--hair); border-radius: 12px;
+    animation: reveal 1s .36s var(--ease) both;
+  }
+  .dm-composer input[type="text"] {
+    flex: 1; min-width: 0; border: 0; background: transparent; color: var(--paper);
+    font: inherit; font-size: 13px; padding: 4px 2px; outline: none;
+  }
+  .dm-composer input[type="text"]::placeholder { color: var(--ink-soft); }
+  .dm-colors { display: flex; gap: 6px; flex: none; }
+  .dm-colors button {
+    width: 15px; height: 15px; padding: 0; border-radius: 50%; cursor: pointer;
+    border: 1px solid var(--hair-strong); background: transparent;
+    transition: transform .2s var(--ease), box-shadow .2s ease;
+  }
+  .dm-colors button[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--hair-strong); transform: scale(1.12); }
+  .dm-size {
+    flex: none; padding: 5px 10px; border-radius: 8px; cursor: pointer;
+    border: 1px solid var(--hair); background: transparent; color: var(--ink);
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: .1em;
+  }
+  .dm-send {
+    flex: none; padding: 7px 16px; border-radius: 980px; border: 0; cursor: pointer;
+    background: var(--btn-bg); color: var(--btn-fg); font-size: 12.5px; font-weight: 500;
+    transition: background-color .2s ease, opacity .2s ease;
+  }
+  .dm-send:hover { background: var(--btn-bg-hover); }
+  .dm-send:disabled { opacity: .5; cursor: default; }
+  .dm-note { margin: 8px 0 0; font-size: 10.5px; letter-spacing: .04em; color: var(--ink-soft); text-align: center; }
+
+  /* 上传区 */
+  .upload-card {
+    margin: 18px 0 0; padding: 18px; border: 1px solid var(--hair); border-radius: 12px;
+    animation: reveal 1s .5s var(--ease) both;
+  }
+  .upload-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+  .upload-head b { font-weight: 500; font-size: 13.5px; }
+  .upload-head span { font-family: var(--mono); font-size: 9.5px; letter-spacing: .18em; text-transform: uppercase; color: var(--ink-soft); }
+  .dropzone {
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    padding: 20px; border: 1px dashed var(--hair-strong); border-radius: 10px;
+    color: var(--ink); font-size: 12.5px; cursor: pointer; text-align: center;
+    transition: border-color .2s ease, background-color .2s ease;
+  }
+  .dropzone:hover, .dropzone.over { border-color: var(--paper); background: var(--hover-fill); }
+  .dropzone input { display: none; }
+  .upload-strip { display: flex; gap: 8px; margin-top: 12px; overflow-x: auto; padding-bottom: 2px; }
+  .upload-strip a { flex: none; display: block; }
+  .upload-strip img {
+    width: 66px; height: 66px; object-fit: cover; border-radius: 8px;
+    border: 1px solid var(--hair); display: block;
+  }
+  .upload-note { margin: 10px 0 0; font-size: 10.5px; color: var(--ink-soft); letter-spacing: .03em; }
+
   /* 风采入口：细线行，像目录条目 */
   .gallery-entry {
     display: flex; align-items: center; gap: 14px; width: 100%; margin: 32px 0 0;
@@ -405,6 +478,7 @@ var page_default = `<!DOCTYPE html>
   <div class="exhibit">
     <div class="frame">
       <img class="naiwa-img" src="/naiwa.jpg" alt="奶蛙" width="512" height="512" decoding="async" fetchpriority="high">
+      <div class="danmaku-layer" id="dm-layer" aria-hidden="true"></div>
       
     </div>
   </div>
@@ -415,6 +489,14 @@ var page_default = `<!DOCTYPE html>
     <span class="detail">态度：胸有成竹 / 材质：奶 / 来源：民间</span>
     <span class="detail">状态：常设展 &middot; 无需门票</span>
   </p>
+
+  <div class="dm-composer">
+    <input type="text" id="dm-text" maxlength="60" placeholder="在奶蛙头上留一句…" autocomplete="off" aria-label="弹幕内容">
+    <div class="dm-colors" id="dm-colors" role="group" aria-label="颜色"></div>
+    <button class="dm-size" id="dm-size" type="button" aria-label="字号">15px</button>
+    <button class="dm-send" id="dm-send" type="button">发送</button>
+  </div>
+  <p class="dm-note" id="dm-note">弹幕会飘过奶蛙头像；同一来源 1 分钟内最多 3 条</p>
 
   <p class="headline">
     你是第
@@ -436,6 +518,16 @@ var page_default = `<!DOCTYPE html>
     <span class="gallery-title">奶蛙中学风采<small>（可投稿）</small></span>
     <svg class="gallery-chev" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
   </button>
+
+  <section class="upload-card">
+    <div class="upload-head"><b>上传图片</b><span>≤ 10 MB</span></div>
+    <label class="dropzone" id="dropzone">
+      <input type="file" id="file-input" accept="image/jpeg,image/png,image/gif,image/webp">
+      <span id="drop-text">点击选择，或把图片拖到这里（JPG / PNG / GIF / WebP）</span>
+    </label>
+    <div class="upload-strip" id="upload-strip"></div>
+    <p class="upload-note">上传后任何人可见；管理员可在 /admin 删除。</p>
+  </section>
 </main>
   <div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-labelledby="lightbox-title" hidden>
     <div class="lightbox-scrim" data-close></div>
@@ -570,6 +662,183 @@ var page_default = `<!DOCTYPE html>
 
     boot();
 
+    /* ---------------------------------------------------- 弹幕 + 上传 */
+    (function initWall() {
+      var layer = byId("dm-layer");
+      var text = byId("dm-text");
+      var send = byId("dm-send");
+      var note = byId("dm-note");
+      var palette = ["#f5f5f7", "#ffd166", "#7ad0a0", "#8ab4ff", "#ff9db1", "#d8bb62"];
+      var colorsBox = byId("dm-colors");
+      var sizeBtn = byId("dm-size");
+      var sizes = [13, 15, 18, 22];
+      var sizeIndex = 1;
+      var picked = palette[0];
+      var seen = {};
+      var tracks = 0;
+      var trackIndex = 0;
+      var timer = null;
+      var reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+      if (!layer) return;
+
+      // 颜色按钮
+      palette.forEach(function (hex) {
+        var b = document.createElement("button");
+        b.type = "button";
+        b.style.background = hex;
+        b.setAttribute("aria-label", hex);
+        b.setAttribute("aria-pressed", String(hex === picked));
+        b.addEventListener("click", function () {
+          picked = hex;
+          Array.prototype.forEach.call(colorsBox.children, function (el) {
+            el.setAttribute("aria-pressed", String(el === b));
+          });
+        });
+        colorsBox.appendChild(b);
+      });
+
+      function setSize(idx) {
+        sizeIndex = (idx + sizes.length) % sizes.length;
+        sizeBtn.textContent = sizes[sizeIndex] + "px";
+      }
+      sizeBtn.addEventListener("click", function () { setSize(sizeIndex + 1); });
+
+      function say(msg) {
+        if (note) note.textContent = msg;
+      }
+
+      function float(item) {
+        if (reduced || !layer) return;
+        var span = document.createElement("span");
+        span.textContent = item.text;
+        span.style.color = item.color || "#f5f5f7";
+        span.style.fontSize = Math.min(28, Math.max(12, item.size || 15)) + "px";
+        span.style.top = "0px";
+        layer.appendChild(span);
+
+        // 轨道：先尝试空闲轨，满了就随机
+        var rows = Math.max(3, Math.floor(layer.clientHeight / 30));
+        var row = trackIndex % rows;
+        trackIndex += 1;
+        var y = 6 + row * 28;
+        span.style.top = y + "px";
+
+        var dist = layer.clientWidth + span.offsetWidth + 20;
+        span.style.setProperty("--dm-from", dist / 2 + "px");
+        span.style.setProperty("--dm-to", -(dist) + "px");
+        var dur = Math.max(7, Math.min(16, dist / 55));
+        span.style.animationDuration = dur + "s";
+        span.addEventListener("animationend", function () { span.remove(); });
+      }
+
+      function addAll(items) {
+        var fresh = [];
+        (items || []).forEach(function (item) {
+          if (seen[item.id]) return;
+          seen[item.id] = true;
+          fresh.push(item);
+        });
+        fresh.slice(-6).forEach(function (item, i) {
+          setTimeout(function () { float(item); }, i * 900);
+        });
+      }
+
+      function load() {
+        fetch("/api/wall", { credentials: "same-origin" })
+          .then(function (r) { return r.ok ? r.json() : null; })
+          .then(function (data) {
+            if (!data) return;
+            addAll(data.danmaku || []);
+            renderUploads(data.uploads || []);
+            if (data.enabled === false) say("留言尚未启用");
+          })
+          .catch(function () {});
+      }
+
+      function renderUploads(items) {
+        var strip = byId("upload-strip");
+        if (!strip) return;
+        strip.innerHTML = "";
+        items.slice(0, 12).forEach(function (u) {
+          var a = document.createElement("a");
+          a.href = "/img/" + u.id;
+          a.target = "_blank";
+          a.rel = "noopener noreferrer";
+          var img = document.createElement("img");
+          img.src = "/img/" + u.id;
+          img.alt = u.title || "上传的图片";
+          img.loading = "lazy";
+          a.appendChild(img);
+          strip.appendChild(a);
+        });
+      }
+
+      function post() {
+        var value = (text.value || "").trim();
+        if (!value) { say("先写点什么再发"); return; }
+        send.disabled = true;
+        fetch("/api/wall/danmaku", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify({ text: value, color: picked, size: sizes[sizeIndex] }),
+        })
+          .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+          .then(function (res) {
+            send.disabled = false;
+            if (!res.ok) { say((res.d && res.d.error) || "发送失败"); return; }
+            text.value = "";
+            say("已飘上去啦");
+            float({ text: value, color: picked, size: sizes[sizeIndex] });
+            if (res.d && res.d.item) seen[res.d.item.id] = true;
+          })
+          .catch(function () { send.disabled = false; say("网络出错，稍后再试"); });
+      }
+
+      if (send) send.addEventListener("click", post);
+      if (text) text.addEventListener("keydown", function (e) { if (e.key === "Enter") post(); });
+
+      /* 上传 */
+      var zone = byId("dropzone");
+      var input = byId("file-input");
+      function upload(file) {
+        if (!file) return;
+        if (file.size > 10 * 1024 * 1024) { say("超过 10MB，换小一点的"); return; }
+        say("正在上传 " + Math.round(file.size / 1024) + " KB…");
+        fetch("/api/wall/upload", {
+          method: "POST",
+          headers: { "content-type": file.type || "application/octet-stream" },
+          credentials: "same-origin",
+          body: file,
+        })
+          .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+          .then(function (res) {
+            if (!res.ok) { say((res.d && res.d.error) || "上传失败"); return; }
+            say("上传成功，正在刷新列表");
+            load();
+          })
+          .catch(function () { say("上传出错，稍后再试"); });
+      }
+      if (input) input.addEventListener("change", function () { upload(input.files && input.files[0]); });
+      if (zone) {
+        ["dragenter", "dragover"].forEach(function (ev) {
+          zone.addEventListener(ev, function (e) { e.preventDefault(); zone.classList.add("over"); });
+        });
+        ["dragleave", "drop"].forEach(function (ev) {
+          zone.addEventListener(ev, function (e) { e.preventDefault(); zone.classList.remove("over"); });
+        });
+        zone.addEventListener("drop", function (e) {
+          var file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+          upload(file);
+        });
+      }
+
+      load();
+      timer = setInterval(load, 45000);
+      window.addEventListener("pagehide", function () { if (timer) clearInterval(timer); });
+    })();
+
     /* 配色切换：写入 data-theme 并持久化 */
     (function initTheme() {
       var root = document.documentElement;
@@ -648,6 +917,548 @@ var page_default = `<!DOCTYPE html>
 
 // src/mail.html
 var mail_default = '<!DOCTYPE html>\n<html lang="zh-CN">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n<meta name="color-scheme" content="dark">\n<meta name="robots" content="noindex, nofollow">\n<meta name="referrer" content="no-referrer">\n<title>邮箱 · {{TITLE}}</title>\n<link rel="icon" href="/favicon.ico" sizes="any">\n<link rel="icon" type="image/png" href="/favicon.png" sizes="64x64">\n<style nonce="{{NONCE}}">\n  :root {\n    --paper: #f5f5f7; --ink: #8a8a8f; --ink-soft: #63636a;\n    --hair: rgba(255,255,255,.085); --hair-strong: rgba(255,255,255,.16);\n    --black: #050506; --ok: #3fa86a; --warn: #d8bb62;\n    --ease: cubic-bezier(.16,1,.3,1);\n    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;\n  }\n  *, *::before, *::after { box-sizing: border-box; }\n  body {\n    margin: 0; min-height: 100svh; background: var(--black); color: var(--paper);\n    display: flex; align-items: center; justify-content: center; padding: 48px 24px;\n    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue",\n                 "PingFang SC", "Microsoft YaHei", sans-serif;\n    font-size: 15px; line-height: 1.55; -webkit-font-smoothing: antialiased;\n  }\n  body::before {\n    content: ""; position: fixed; left: 50%; top: -18vh; width: 120vw; height: 90vh;\n    transform: translateX(-50%); pointer-events: none; z-index: 0;\n    background: radial-gradient(38% 34% at 42% 12%, rgba(255,255,255,.13), transparent 68%);\n  }\n  main { position: relative; z-index: 1; width: min(560px, 100%); }\n  .seam {\n    height: 1px; margin: 0 0 30px;\n    background: linear-gradient(90deg, transparent, var(--hair-strong) 22%, var(--hair-strong) 78%, transparent);\n  }\n  .kicker {\n    margin: 0 0 26px; font-family: var(--mono); font-size: 10.5px;\n    letter-spacing: .22em; text-transform: uppercase; color: var(--ink-soft);\n  }\n  h1 { margin: 0 0 6px; font-size: 30px; font-weight: 500; letter-spacing: -.03em; }\n  .sub { margin: 0 0 34px; font-size: 14px; color: var(--ink); }\n  .addr {\n    display: block; margin: 0 0 30px; padding: 16px 18px; border: 1px solid var(--hair);\n    border-radius: 10px; font-family: var(--mono); font-size: 13px; letter-spacing: .02em;\n    color: var(--paper); word-break: break-all;\n  }\n  .addr b { color: var(--ink-soft); font-weight: 400; }\n  .rows { list-style: none; margin: 0 0 30px; padding: 0; border-top: 1px solid var(--hair); }\n  .rows li {\n    display: flex; justify-content: space-between; gap: 14px; padding: 12px 0;\n    border-bottom: 1px solid var(--hair); font-size: 13px;\n  }\n  .rows span { color: var(--ink-soft); }\n  .rows em { font-style: normal; font-family: var(--mono); font-size: 12px; color: var(--paper); }\n  .rows em.on { color: var(--ok); }\n  .rows em.off { color: var(--warn); }\n  .actions { display: flex; flex-wrap: wrap; gap: 12px; }\n  .btn {\n    display: inline-flex; align-items: center; gap: 8px; padding: 11px 22px;\n    border-radius: 980px; text-decoration: none; font-size: 14px; font-weight: 500;\n    border: 1px solid var(--hair-strong); color: var(--paper);\n    transition: background-color .2s ease, border-color .2s ease;\n  }\n  .btn:hover { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.28); }\n  .btn.primary { background: var(--paper); color: #0a0a0c; border-color: var(--paper); }\n  .btn.primary:hover { background: #fff; }\n  .note {\n    margin: 34px 0 0; padding-top: 18px; border-top: 1px solid var(--hair);\n    font-size: 12px; line-height: 1.9; color: var(--ink-soft);\n  }\n  .note code { font-family: var(--mono); font-size: 11.5px; color: var(--ink); }\n  @media (max-width: 520px) {\n    h1 { font-size: 24px; }\n    .actions { flex-direction: column; align-items: stretch; }\n    .btn { justify-content: center; }\n  }\n</style>\n</head>\n<body>\n<main>\n  <div class="seam"></div>\n  <p class="kicker">Mail &middot; {{ZONE}}</p>\n\n  <h1>学校邮箱</h1>\n  <p class="sub">任何前缀都能收，邮件转发到你的常用邮箱。</p>\n\n  <code class="addr">*@{{ZONE}} <b>&rarr;</b> {{DEST}}</code>\n\n  <ul class="rows">\n    <li><span>收件（MX 记录）</span><em class="{{MX_CLASS}}">{{MX_TEXT}}</em></li>\n    <li><span>转发目标</span><em>{{DEST}}</em></li>\n    <li><span>发件</span><em class="off">需第三方代发</em></li>\n  </ul>\n\n  <div class="actions">\n    <a class="btn primary" href="https://mail.qq.com/" target="_blank" rel="noopener noreferrer">打开 QQ 邮箱</a>\n    <a class="btn" href="{{DASH_URL}}" target="_blank" rel="noopener noreferrer">Cloudflare 邮件路由</a>\n  </div>\n\n  <p class="note">\n    收件由 Cloudflare Email Routing 免费完成：在面板启用后，MX 会自动写入 DNS，\n    随后把目标地址加进「Destination addresses」并在邮箱里点一次确认链接即可。<br>\n    发件不由本域直接投递（Cloudflare 不提供邮箱账号与 IMAP/SMTP）；\n    想在 QQ 邮箱里以 <code>@{{ZONE}}</code> 的身份回信，可在 QQ 邮箱设置里添加「其他邮箱」并用其 SMTP 代发。\n  </p>\n</main>\n</body>\n</html>\n';
+
+// src/admin.html
+var admin_default = '<!DOCTYPE html>\n<html lang="zh-CN" data-theme="noir">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n<meta name="color-scheme" content="dark">\n<meta name="robots" content="noindex, nofollow">\n<title>管理台 · 奶蛙中学</title>\n<link rel="icon" href="/favicon.ico" sizes="any">\n<style nonce="{{NONCE}}">\n  :root {\n    --bg: #050506; --fg: #f5f5f7; --ink: #8a8a8f; --soft: #63636a;\n    --hair: rgba(255,255,255,.09); --hair2: rgba(255,255,255,.18);\n    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;\n  }\n  *, *::before, *::after { box-sizing: border-box; }\n  body {\n    margin: 0; background: var(--bg); color: var(--fg); min-height: 100vh;\n    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Microsoft YaHei", sans-serif;\n    font-size: 14px; line-height: 1.6; -webkit-font-smoothing: antialiased;\n  }\n  .wrap { width: min(920px, 100%); margin: 0 auto; padding: 44px 24px 80px; }\n  .kicker { font-family: var(--mono); font-size: 10px; letter-spacing: .22em; text-transform: uppercase; color: var(--soft); margin: 0 0 20px; }\n  h1 { font-size: 26px; font-weight: 500; letter-spacing: -.02em; margin: 0 0 6px; }\n  .sub { color: var(--ink); margin: 0 0 28px; font-size: 13px; }\n  .seam { height: 1px; background: linear-gradient(90deg, transparent, var(--hair2) 20%, var(--hair2) 80%, transparent); margin: 0 0 26px; }\n  .card { border: 1px solid var(--hair); border-radius: 12px; padding: 20px; margin-bottom: 18px; }\n  .card h2 { font-size: 14px; font-weight: 500; margin: 0 0 14px; letter-spacing: .01em; }\n  .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }\n  button {\n    font: inherit; font-size: 13px; padding: 9px 18px; border-radius: 980px; cursor: pointer;\n    border: 1px solid var(--hair2); background: transparent; color: var(--fg);\n    transition: background-color .2s ease, border-color .2s ease, opacity .2s ease;\n  }\n  button:hover { background: rgba(255,255,255,.06); }\n  button.primary { background: var(--fg); color: #0a0a0c; border-color: var(--fg); }\n  button.primary:hover { background: #fff; }\n  button.danger { border-color: rgba(217,139,134,.45); color: #d98b86; }\n  button.danger:hover { background: rgba(217,139,134,.1); }\n  button:disabled { opacity: .45; cursor: default; }\n  input[type="text"], input[type="password"] {\n    font: inherit; font-size: 13px; padding: 9px 14px; border-radius: 9px; min-width: 240px;\n    border: 1px solid var(--hair2); background: rgba(255,255,255,.03); color: var(--fg);\n  }\n  input:focus { outline: 2px solid var(--hair2); outline-offset: 1px; }\n  .hint { color: var(--soft); font-size: 12px; margin: 12px 0 0; line-height: 1.8; }\n  .status { font-family: var(--mono); font-size: 11.5px; letter-spacing: .06em; margin: 14px 0 0; min-height: 18px; }\n  .status.ok { color: #3fa86a; } .status.err { color: #d98b86; } .status.warn { color: #d8bb62; }\n  .tabs { display: flex; gap: 8px; margin: 26px 0 14px; }\n  .tabs button { padding: 7px 16px; font-size: 12.5px; }\n  .tabs button[aria-selected="true"] { background: rgba(255,255,255,.09); border-color: var(--hair2); }\n  .list { list-style: none; margin: 0; padding: 0; }\n  .list li { display: flex; gap: 14px; align-items: flex-start; padding: 12px 0; border-bottom: 1px solid var(--hair); }\n  .list li:last-child { border-bottom: 0; }\n  .meta { flex: 1; min-width: 0; }\n  .meta b { font-weight: 500; word-break: break-word; }\n  .meta span { display: block; font-family: var(--mono); font-size: 10.5px; color: var(--soft); letter-spacing: .04em; margin-top: 3px; }\n  .thumb { width: 64px; height: 64px; border-radius: 8px; object-fit: cover; border: 1px solid var(--hair); flex: none; }\n  .empty { color: var(--soft); font-size: 12.5px; padding: 10px 0; }\n  .hide { display: none !important; }\n</style>\n</head>\n<body>\n<div class="wrap">\n  <div class="seam"></div>\n  <p class="kicker">Admin &middot; 奶蛙中学</p>\n  <h1>管理台</h1>\n  <p class="sub">用本机 passkey 登录后，可以删除弹幕、删除上传的图片。</p>\n\n  <!-- 未登录 -->\n  <section id="gate">\n    <div class="card" id="card-passkey">\n      <h2>用 passkey 登录</h2>\n      <div class="row">\n        <button class="primary" id="btn-login" type="button">这台电脑的 passkey</button>\n        <button id="btn-register" type="button">添加新的 passkey</button>\n      </div>\n      <p class="hint" id="passkey-hint">正在读取状态…</p>\n      <p class="status" id="gate-status"></p>\n    </div>\n\n    <div class="card" id="card-token">\n      <h2>首次配置：用管理令牌引导</h2>\n      <div class="row">\n        <input type="password" id="token-input" placeholder="ADMIN_TOKEN" autocomplete="off">\n        <button class="primary" id="btn-token" type="button">验证</button>\n      </div>\n      <p class="hint">令牌只用于这次引导，验证后立刻改用 passkey。它存在 Worker Secret 里（ADMIN_TOKEN）。</p>\n      <p class="status" id="token-status"></p>\n    </div>\n  </section>\n\n  <!-- 已登录 -->\n  <section id="panel" class="hide">\n    <div class="card">\n      <div class="row" style="justify-content: space-between">\n        <div>\n          <h2 style="margin: 0">已登录</h2>\n          <span class="hint" style="margin: 0" id="whoami">—</span>\n        </div>\n        <button id="btn-logout" type="button">退出</button>\n      </div>\n    </div>\n\n    <div class="tabs" role="tablist">\n      <button role="tab" aria-selected="true" data-tab="danmaku" id="tab-danmaku">弹幕</button>\n      <button role="tab" aria-selected="false" data-tab="uploads" id="tab-uploads">图片</button>\n      <button role="tab" aria-selected="false" data-tab="keys" id="tab-keys">密钥</button>\n    </div>\n\n    <div class="card">\n      <ul class="list" id="list"></ul>\n      <p class="empty hide" id="empty">这里还是空的。</p>\n      <p class="status" id="panel-status"></p>\n    </div>\n  </section>\n</div>\n\n<script nonce="{{NONCE}}">\n  "use strict";\n\n  const $ = (id) => document.getElementById(id);\n  const b64u = {\n    enc(buf) {\n      const b = new Uint8Array(buf);\n      let s = "";\n      for (let i = 0; i < b.length; i += 1) s += String.fromCharCode(b[i]);\n      return btoa(s).replace(/\\+/g, "-").replace(/\\//g, "_").replace(/=+$/, "");\n    },\n    dec(str) {\n      const s = String(str).replace(/-/g, "+").replace(/_/g, "/");\n      const bin = atob(s + (s.length % 4 ? "=".repeat(4 - (s.length % 4)) : ""));\n      const out = new Uint8Array(bin.length);\n      for (let i = 0; i < bin.length; i += 1) out[i] = bin.charCodeAt(i);\n      return out;\n    },\n  };\n\n  let state = { authed: false, tokenOk: false, passkeys: [], vault: false };\n  let tab = "danmaku";\n  let cache = { danmaku: [], uploads: [] };\n\n  function say(el, text, kind) {\n    const node = $(el);\n    node.textContent = text || "";\n    node.className = "status" + (kind ? " " + kind : "");\n  }\n\n  async function api(path, options) {\n    const res = await fetch("/admin/api" + path, {\n      method: (options && options.method) || "GET",\n      headers: { "content-type": "application/json" },\n      credentials: "same-origin",\n      body: options && options.body ? JSON.stringify(options.body) : undefined,\n    });\n    const data = await res.json().catch(() => ({}));\n    if (!res.ok) throw new Error(data.error || "HTTP " + res.status);\n    return data;\n  }\n\n  /* --------------------------------------------------- passkey */\n\n  async function refresh() {\n    try {\n      state = await api("/session");\n    } catch (err) {\n      say("gate-status", "读取失败：" + err.message, "err");\n      return;\n    }\n    $("whoami").textContent = state.authed\n      ? "已通过 passkey 验证 · 已注册 " + state.passkeys.length + " 个密钥"\n      : "—";\n\n    if (state.authed) {\n      $("gate").classList.add("hide");\n      $("panel").classList.remove("hide");\n      await loadList();\n    } else {\n      $("gate").classList.remove("hide");\n      $("panel").classList.add("hide");\n      const has = state.passkeys.length > 0;\n      $("btn-login").disabled = !has;\n      $("passkey-hint").textContent = has\n        ? "已注册 " + state.passkeys.length + " 个 passkey。点左边按钮，用 Windows Hello / 指纹解锁。"\n        : "这台电脑还没绑定 passkey：先点「添加新的 passkey」，需要先在下面输入一次管理令牌。";\n    }\n  }\n\n  function credToJSON(cred) {\n    const r = cred.response;\n    const out = { id: cred.id, rawId: b64u.enc(cred.rawId), type: cred.type };\n    if (r.attestationObject) {\n      out.response = {\n        clientDataJSON: b64u.enc(r.clientDataJSON),\n        attestationObject: b64u.enc(r.attestationObject),\n      };\n      if (r.getTransports) out.transports = r.getTransports();\n    } else {\n      out.response = {\n        clientDataJSON: b64u.enc(r.clientDataJSON),\n        authenticatorData: b64u.enc(r.authenticatorData),\n        signature: b64u.enc(r.signature),\n        userHandle: r.userHandle ? b64u.enc(r.userHandle) : null,\n      };\n    }\n    return out;\n  }\n\n  async function register() {\n    say("gate-status", "正在请求系统验证…", "warn");\n    try {\n      const opts = await api("/passkey/options", { method: "POST", body: { mode: "register" } });\n      const pk = opts.publicKey;\n      pk.challenge = b64u.dec(pk.challenge);\n      pk.user.id = b64u.dec(pk.user.id);\n      const cred = await navigator.credentials.create({ publicKey: pk });\n      if (!cred) throw new Error("系统没有返回凭据");\n      await api("/passkey/register", {\n        method: "POST",\n        body: { response: credToJSON(cred).response, name: navigator.userAgent.slice(0, 40) },\n      });\n      say("gate-status", "passkey 已绑定，这台电脑以后可以直接登录", "ok");\n      await refresh();\n    } catch (err) {\n      say("gate-status", "注册失败：" + (err.message || err), "err");\n    }\n  }\n\n  async function login() {\n    say("gate-status", "正在请求系统验证…", "warn");\n    try {\n      const opts = await api("/passkey/options", { method: "POST", body: { mode: "login" } });\n      const pk = opts.publicKey;\n      pk.challenge = b64u.dec(pk.challenge);\n      pk.allowCredentials = (pk.allowCredentials || []).map((c) => ({ ...c, id: b64u.dec(c.id) }));\n      const cred = await navigator.credentials.get({ publicKey: pk });\n      if (!cred) throw new Error("系统没有返回凭据");\n      await api("/passkey/login", { method: "POST", body: { id: cred.id, response: credToJSON(cred).response } });\n      say("gate-status", "", "");\n      await refresh();\n    } catch (err) {\n      say("gate-status", "登录失败：" + (err.message || err), "err");\n    }\n  }\n\n  async function tokenLogin() {\n    const token = $("token-input").value.trim();\n    if (!token) return say("token-status", "请先填入令牌", "warn");\n    try {\n      await api("/token", { method: "POST", body: { token } });\n      say("token-status", "验证通过，现在可以添加 passkey", "ok");\n      await refresh();\n    } catch (err) {\n      say("token-status", "验证失败：" + (err.message || err), "err");\n    }\n  }\n\n  /* --------------------------------------------------- 列表 */\n\n  async function loadList() {\n    try {\n      const data = await api("/list");\n      cache = { danmaku: data.danmaku || [], uploads: data.uploads || [] };\n      render();\n    } catch (err) {\n      say("panel-status", "读取失败：" + err.message, "err");\n    }\n  }\n\n  function render() {\n    const list = $("list");\n    list.innerHTML = "";\n    let items = [];\n\n    if (tab === "danmaku") {\n      items = cache.danmaku.map((d) => ({ kind: "danmaku", id: d.id, title: d.text, meta: `${d.color} · ${d.size}px · ${when(d.created)}` }));\n    } else if (tab === "uploads") {\n      items = cache.uploads.map((u) => ({ kind: "upload", id: u.id, title: u.title || u.id, meta: `${u.mime} · ${(u.bytes / 1024).toFixed(1)} KB · ${when(u.created)}`, thumb: "/img/" + u.id }));\n    } else {\n      items = state.passkeys.map((k) => ({ kind: "passkey", id: k.id, title: k.name || k.id.slice(0, 12), meta: "注册于 " + when(k.created) }));\n    }\n\n    $("empty").classList.toggle("hide", items.length > 0);\n\n    for (const item of items) {\n      const li = document.createElement("li");\n      if (item.thumb) {\n        const img = document.createElement("img");\n        img.className = "thumb";\n        img.src = item.thumb;\n        img.alt = "";\n        img.loading = "lazy";\n        li.appendChild(img);\n      }\n      const meta = document.createElement("div");\n      meta.className = "meta";\n      const b = document.createElement("b");\n      b.textContent = item.title;\n      const sp = document.createElement("span");\n      sp.textContent = item.meta;\n      meta.append(b, sp);\n      li.appendChild(meta);\n\n      const del = document.createElement("button");\n      del.type = "button";\n      del.className = "danger";\n      del.textContent = "删除";\n      del.addEventListener("click", async () => {\n        del.disabled = true;\n        try {\n          if (item.kind === "passkey") await api("/passkey/remove", { method: "POST", body: { id: item.id } });\n          else await api("/delete", { method: "POST", body: { kind: item.kind, id: item.id } });\n          say("panel-status", "已删除", "ok");\n          await refresh();\n        } catch (err) {\n          say("panel-status", "删除失败：" + err.message, "err");\n          del.disabled = false;\n        }\n      });\n      li.appendChild(del);\n      list.appendChild(li);\n    }\n  }\n\n  function when(ts) {\n    if (!ts) return "—";\n    const d = new Date(ts);\n    return d.toLocaleString("zh-CN", { hour12: false });\n  }\n\n  /* --------------------------------------------------- 事件 */\n\n  $("btn-login").addEventListener("click", login);\n  $("btn-register").addEventListener("click", register);\n  $("btn-token").addEventListener("click", tokenLogin);\n  $("btn-logout").addEventListener("click", async () => {\n    await api("/logout", { method: "POST" }).catch(() => {});\n    await refresh();\n  });\n\n  for (const btn of document.querySelectorAll("[data-tab]")) {\n    btn.addEventListener("click", () => {\n      tab = btn.dataset.tab;\n      for (const other of document.querySelectorAll("[data-tab]")) {\n        other.setAttribute("aria-selected", String(other === btn));\n      }\n      render();\n    });\n  }\n\n  refresh();\n<\/script>\n</body>\n</html>\n';
+
+// src/webauthn.js
+var TE = new TextEncoder();
+var TD = new TextDecoder();
+function b64uEncode(bytes) {
+  const b = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+  let s = "";
+  for (let i = 0; i < b.length; i += 1) s += String.fromCharCode(b[i]);
+  return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+function b64uDecode(text2) {
+  const s = String(text2).replace(/-/g, "+").replace(/_/g, "/");
+  const pad = s.length % 4 === 0 ? "" : "=/".repeat((4 - s.length % 4) % 4).replace("/", "");
+  const bin = atob(s + (s.length % 4 ? "=".repeat(4 - s.length % 4) : ""));
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i += 1) out[i] = bin.charCodeAt(i);
+  return out;
+}
+async function sha256(bytes) {
+  return new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
+}
+function concat(a, b) {
+  const out = new Uint8Array(a.length + b.length);
+  out.set(a, 0);
+  out.set(b, a.length);
+  return out;
+}
+function bytesEq(a, b) {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i += 1) if (a[i] !== b[i]) return false;
+  return true;
+}
+function decodeItem(b, i) {
+  const ib = b[i];
+  const major = ib >> 5;
+  const ai = ib & 31;
+  i += 1;
+  let len = ai;
+  if (ai === 24) {
+    len = b[i];
+    i += 1;
+  } else if (ai === 25) {
+    len = b[i] << 8 | b[i + 1];
+    i += 2;
+  } else if (ai === 26) {
+    len = (b[i] << 24 | b[i + 1] << 16 | b[i + 2] << 8 | b[i + 3]) >>> 0;
+    i += 4;
+  } else if (ai === 27) {
+    i += 8;
+    len = 0;
+  }
+  switch (major) {
+    case 0:
+      return [len, i];
+    case 1:
+      return [-1 - len, i];
+    case 2:
+      return [b.subarray(i, i + len), i + len];
+    case 3:
+      return [TD.decode(b.subarray(i, i + len)), i + len];
+    case 4: {
+      const arr = [];
+      for (let k = 0; k < len; k += 1) {
+        const [v, ni] = decodeItem(b, i);
+        arr.push(v);
+        i = ni;
+      }
+      return [arr, i];
+    }
+    case 5: {
+      const map = {};
+      for (let k = 0; k < len; k += 1) {
+        const [key, ni] = decodeItem(b, i);
+        const [val, ni2] = decodeItem(b, ni);
+        map[String(key)] = val;
+        i = ni2;
+      }
+      return [map, i];
+    }
+    case 6: {
+      const [, ni] = decodeItem(b, i);
+      return decodeItem(b, ni);
+    }
+    default:
+      if (ai === 20) return [false, i];
+      if (ai === 21) return [true, i];
+      if (ai === 22) return [null, i];
+      return [null, i];
+  }
+}
+function cborDecode(bytes) {
+  return decodeItem(bytes, 0)[0];
+}
+function parseAuthData(b) {
+  if (b.length < 37) throw new Error("authData 太短");
+  const rpIdHash = b.subarray(0, 32);
+  const flags = b[32];
+  const signCount = (b[33] << 24 | b[34] << 16 | b[35] << 8 | b[36]) >>> 0;
+  let i = 37;
+  let credentialId = null;
+  let cose = null;
+  if (flags & 64) {
+    i += 16;
+    const idLen = b[i] << 8 | b[i + 1];
+    i += 2;
+    credentialId = b.subarray(i, i + idLen);
+    i += idLen;
+    cose = decodeItem(b, i)[0];
+  }
+  return { rpIdHash, flags, signCount, credentialId, cose };
+}
+function coseToKey(cose) {
+  const kty = cose["1"];
+  const alg = cose["3"];
+  if (kty === 2 && alg === -7) {
+    const x = cose["-2"];
+    const y = cose["-3"];
+    if (!x || !y) throw new Error("EC 公钥缺少坐标");
+    return { alg: -7, jwk: { kty: "EC", crv: "P-256", x: b64uEncode(x), y: b64uEncode(y) } };
+  }
+  if (kty === 3 && alg === -257) {
+    const n = cose["-1"];
+    const e = cose["-2"];
+    if (!n || !e) throw new Error("RSA 公钥缺少参数");
+    return { alg: -257, jwk: { kty: "RSA", n: b64uEncode(n), e: b64uEncode(e) } };
+  }
+  throw new Error(`不支持的密钥类型 kty=${kty} alg=${alg}`);
+}
+var IMPORT_ALG = {
+  EC: { name: "ECDSA", namedCurve: "P-256" },
+  RSA: { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }
+};
+function derToRaw(sig) {
+  let i = 0;
+  if (sig[i] !== 48) throw new Error("签名不是 DER 序列");
+  i += 1;
+  let seqLen = sig[i];
+  i += 1;
+  if (seqLen & 128) {
+    const n = seqLen & 127;
+    seqLen = 0;
+    for (let k = 0; k < n; k += 1) seqLen = seqLen << 8 | sig[i + k];
+    i += n;
+  }
+  const readInt = () => {
+    if (sig[i] !== 2) throw new Error("DER 段不是 INTEGER");
+    i += 1;
+    let len = sig[i];
+    i += 1;
+    if (len & 128) {
+      const n = len & 127;
+      len = 0;
+      for (let k = 0; k < n; k += 1) len = len << 8 | sig[i + k];
+      i += n;
+    }
+    let v = sig.subarray(i, i + len);
+    i += len;
+    while (v.length > 0 && v[0] === 0) v = v.subarray(1);
+    return v;
+  };
+  const r = readInt();
+  const s = readInt();
+  const out = new Uint8Array(64);
+  out.set(r.subarray(Math.max(0, r.length - 32)), 32 - Math.min(32, r.length));
+  out.set(s.subarray(Math.max(0, s.length - 32)), 64 - Math.min(32, s.length));
+  return out;
+}
+function checkClientData(json5, expectedType, challenge, origin) {
+  let data;
+  try {
+    data = JSON.parse(TD.decode(b64uDecode(json5)));
+  } catch {
+    throw new Error("clientDataJSON 解析失败");
+  }
+  if (data.type !== expectedType) throw new Error(`操作类型不符：${data.type}`);
+  if (data.challenge !== challenge) throw new Error("challenge 不匹配");
+  if (!origin || data.origin !== origin) throw new Error(`origin 不匹配：${data.origin}`);
+  return data;
+}
+async function verifyRegistration({ payload, challenge, origin, rpId }) {
+  checkClientData(payload.clientDataJSON, "webauthn.create", challenge, origin);
+  const att = cborDecode(b64uDecode(payload.attestationObject));
+  if (!att || !att.authData) throw new Error("attestationObject 结构异常");
+  const auth = parseAuthData(new Uint8Array(att.authData));
+  const expectRp = await sha256(TE.encode(rpId));
+  if (!bytesEq(auth.rpIdHash, expectRp)) throw new Error("rpIdHash 不匹配");
+  if (!(auth.flags & 1)) throw new Error("用户未完成存在性验证");
+  if (!auth.credentialId || !auth.cose) throw new Error("缺少凭据或公钥");
+  const { alg, jwk } = coseToKey(auth.cose);
+  return { credentialId: b64uEncode(auth.credentialId), alg, jwk, signCount: auth.signCount };
+}
+async function verifyAssertion({ payload, challenge, origin, rpId, jwk, alg }) {
+  checkClientData(payload.clientDataJSON, "webauthn.get", challenge, origin);
+  const authData = b64uDecode(payload.authenticatorData);
+  const auth = parseAuthData(authData);
+  const expectRp = await sha256(TE.encode(rpId));
+  if (!bytesEq(auth.rpIdHash, expectRp)) throw new Error("rpIdHash 不匹配");
+  if (!(auth.flags & 1)) throw new Error("用户未完成存在性验证");
+  const key = await crypto.subtle.importKey("jwk", jwk, IMPORT_ALG[jwk.kty], false, ["verify"]);
+  const clientHash = await sha256(b64uDecode(payload.clientDataJSON));
+  const signed = concat(authData, clientHash);
+  const signature = b64uDecode(payload.signature);
+  let ok;
+  if (jwk.kty === "EC") {
+    ok = await crypto.subtle.verify({ name: "ECDSA", hash: "SHA-256" }, key, derToRaw(signature), signed);
+  } else {
+    ok = await crypto.subtle.verify("RSASSA-PKCS1-v1_5", key, signature, signed);
+  }
+  if (!ok) throw new Error("签名校验失败");
+  return { signCount: auth.signCount };
+}
+
+// src/wall.js
+var MAX_UPLOAD = 10 * 1024 * 1024;
+var SESSION_TTL = 12 * 3600 * 1e3;
+var CHALLENGE_TTL = 5 * 60 * 1e3;
+var json = (body, status = 200, headers = {}) => new Response(JSON.stringify(body), {
+  status,
+  headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", ...headers }
+});
+var notFound = () => new Response(null, { status: 404 });
+async function hmac(secret, text2) {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret || "insecure-default-salt"),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  return new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(text2)));
+}
+async function sha256Hex(text2) {
+  const d = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text2)));
+  return [...d].map((b) => b.toString(16).padStart(2, "0")).join("").slice(0, 32);
+}
+async function sign(secret, payload) {
+  const body = b64uEncode(new TextEncoder().encode(JSON.stringify(payload)));
+  const mac = b64uEncode(await hmac(secret, body));
+  return `${body}.${mac}`;
+}
+async function unsign(secret, token) {
+  if (typeof token !== "string" || !token.includes(".")) return null;
+  const [body, mac] = token.split(".");
+  const expect = b64uEncode(await hmac(secret, body));
+  if (mac !== expect) return null;
+  try {
+    const payload = JSON.parse(new TextDecoder().decode(b64uDecode(body)));
+    if (!payload || typeof payload.exp !== "number" || payload.exp < Date.now()) return null;
+    return payload;
+  } catch {
+    return null;
+  }
+}
+function cookie(request, name) {
+  const raw = request.headers.get("cookie") || "";
+  for (const part of raw.split(";")) {
+    const [k, ...rest] = part.trim().split("=");
+    if (k === name) return rest.join("=");
+  }
+  return "";
+}
+function setCookie(name, value, maxAge, extra = "") {
+  return `${name}=${value}; Path=/; Max-Age=${Math.floor(maxAge / 1e3)}; HttpOnly; Secure; SameSite=${extra || "Lax"}`;
+}
+function randomId(bytes = 16) {
+  const b = crypto.getRandomValues(new Uint8Array(bytes));
+  return [...b].map((x) => x.toString(16).padStart(2, "0")).join("");
+}
+function vault(env) {
+  const ns = env && env.VAULT;
+  if (!ns) return null;
+  return ns.get(ns.idFromName("vault-v1"));
+}
+async function vaultCall(env, path, init) {
+  const stub = vault(env);
+  if (!stub) return null;
+  const res = await stub.fetch(`https://vault.internal${path}`, init);
+  if (!res.ok) return null;
+  return res.json().catch(() => null);
+}
+var vaultPost = (env, path, body) => vaultCall(env, path, {
+  method: "POST",
+  headers: { "content-type": "application/json" },
+  body: JSON.stringify(body)
+});
+function rpDomain(url) {
+  return url.hostname.replace(/^www\./, "");
+}
+async function isAuthed(request, url, cfg) {
+  if (!cfg || !cfg.apiSecret) return false;
+  const sess = await unsign(cfg.apiSecret, cookie(request, "vw-sess"));
+  return Boolean(sess && sess.role === "admin");
+}
+function hasAdminToken(request, cfg) {
+  const token = request.headers.get("x-admin-token") || "";
+  return Boolean(cfg && cfg.adminToken && token && token === cfg.adminToken);
+}
+async function handleWallGet(env) {
+  const [danmaku, uploads] = await Promise.all([
+    vaultCall(env, "/danmaku?limit=80"),
+    vaultCall(env, "/uploads?limit=60")
+  ]);
+  return json({
+    danmaku: danmaku && danmaku.items || [],
+    uploads: uploads && uploads.items || [],
+    enabled: Boolean(vault(env))
+  });
+}
+async function handleDanmakuPost(request, env, url, cfg) {
+  if (!vault(env)) return json({ error: "留言未启用" }, 503);
+  const length = Number(request.headers.get("content-length") || 0);
+  if (length > 4096) return json({ error: "内容太长" }, 413);
+  const body = await request.json().catch(() => null);
+  if (!body) return json({ error: "格式错误" }, 400);
+  const ip = request.headers.get("cf-connecting-ip") || "0.0.0.0";
+  const iphash = await sha256Hex(`${ip}|${cfg.apiSecret || ""}`);
+  const res = await vaultPost(env, "/danmaku", {
+    text: body.text,
+    color: body.color,
+    size: body.size,
+    iphash
+  });
+  if (!res) return json({ error: "写入失败" }, 500);
+  if (res.error) return json({ error: res.error }, res.error.includes("太快") ? 429 : 400);
+  return json({ ok: true, item: res.item }, 201);
+}
+var MAGIC = [
+  { mime: "image/jpeg", test: (b) => b[0] === 255 && b[1] === 216 && b[2] === 255 },
+  { mime: "image/png", test: (b) => b[0] === 137 && b[1] === 80 && b[2] === 78 && b[3] === 71 },
+  { mime: "image/gif", test: (b) => b[0] === 71 && b[1] === 73 && b[2] === 70 },
+  {
+    mime: "image/webp",
+    test: (b) => b[0] === 82 && b[1] === 73 && b[2] === 70 && b[3] === 70 && b[8] === 87 && b[9] === 69
+  }
+];
+async function handleUploadPost(request, env, url, cfg) {
+  if (!vault(env)) return json({ error: "上传未启用" }, 503);
+  if (!env.UPLOADS) return json({ error: "存储未绑定" }, 503);
+  const declared = Number(request.headers.get("content-length") || 0);
+  if (declared > MAX_UPLOAD) return json({ error: "超过 10MB" }, 413);
+  const buf = new Uint8Array(await request.arrayBuffer());
+  if (!buf.length) return json({ error: "空文件" }, 400);
+  if (buf.length > MAX_UPLOAD) return json({ error: "超过 10MB" }, 413);
+  const kind = MAGIC.find((m) => m.test(buf));
+  if (!kind) return json({ error: "只接受 JPG / PNG / GIF / WebP" }, 415);
+  const id = randomId(10);
+  const title = String(url.searchParams.get("title") || "").slice(0, 60);
+  await env.UPLOADS.put(`img:${id}`, buf, {
+    metadata: { mime: kind.mime, bytes: buf.length, created: Date.now() }
+  });
+  const ip = request.headers.get("cf-connecting-ip") || "0.0.0.0";
+  const iphash = await sha256Hex(`${ip}|${cfg.apiSecret || ""}`);
+  const rec = await vaultPost(env, "/upload", { id, mime: kind.mime, bytes: buf.length, iphash, title });
+  if (!rec || rec.error) {
+    await env.UPLOADS.delete(`img:${id}`);
+    return json({ error: rec && rec.error || "记录失败" }, 429);
+  }
+  return json({ ok: true, item: { id, mime: kind.mime, bytes: buf.length, title } }, 201);
+}
+async function handleImageGet(env, url, id) {
+  if (!env.UPLOADS) return notFound();
+  if (!/^[a-z0-9]{16,32}$/.test(id)) return notFound();
+  const got = await env.UPLOADS.getWithMetadata(`img:${id}`, { type: "arrayBuffer" });
+  if (!got || !got.value) return notFound();
+  const meta = got.metadata || {};
+  return new Response(got.value, {
+    headers: {
+      "content-type": meta.mime || "application/octet-stream",
+      "content-length": String(got.value.byteLength),
+      "cache-control": "public, max-age=31536000, immutable",
+      "x-content-type-options": "nosniff",
+      "content-disposition": "inline",
+      "content-security-policy": "default-src 'none'; sandbox"
+    }
+  });
+}
+function handleAdminPage() {
+  const nonce = randomId(16);
+  const html = admin_default.replaceAll("{{NONCE}}", nonce);
+  return new Response(html, {
+    headers: {
+      "content-type": "text/html; charset=utf-8",
+      "cache-control": "no-store",
+      "x-robots-tag": "noindex, nofollow",
+      "referrer-policy": "no-referrer",
+      "x-content-type-options": "nosniff",
+      "content-security-policy": `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'nonce-${nonce}'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`
+    }
+  });
+}
+async function handleAdminApi(request, env, url, cfg) {
+  const path = url.pathname.replace(/^\/admin\/api/, "");
+  const authed = await isAuthed(request, url, cfg);
+  const tokenOk = hasAdminToken(request, cfg);
+  const rpId = rpDomain(url);
+  const origin = url.origin;
+  if (path === "/session" && request.method === "GET") {
+    const passkeys = await vaultCall(env, "/passkeys") || { items: [] };
+    return json({
+      authed,
+      tokenOk,
+      rpId,
+      passkeys: passkeys.items || [],
+      vault: Boolean(vault(env))
+    });
+  }
+  if (path === "/passkey/options" && request.method === "POST") {
+    const body = await request.json().catch(() => ({}));
+    const mode = body.mode === "register" ? "register" : "login";
+    if (mode === "register" && !authed && !tokenOk) return json({ error: "需要先通过令牌验证" }, 403);
+    const challenge = b64uEncode(crypto.getRandomValues(new Uint8Array(32)));
+    const cookieVal = await sign(cfg.apiSecret, { c: challenge, exp: Date.now() + CHALLENGE_TTL, mode });
+    const headers = { "set-cookie": setCookie("vw-chal", cookieVal, CHALLENGE_TTL) };
+    if (mode === "register") {
+      return json(
+        {
+          publicKey: {
+            challenge,
+            rp: { id: rpId, name: "奶蛙中学 · 留言板" },
+            user: { id: b64uEncode(crypto.getRandomValues(new Uint8Array(16))), name: "admin", displayName: "管理员" },
+            pubKeyCredParams: [
+              { type: "public-key", alg: -7 },
+              { type: "public-key", alg: -257 }
+            ],
+            timeout: 6e4,
+            attestation: "none",
+            authenticatorSelection: { residentKey: "preferred", userVerification: "preferred" }
+          }
+        },
+        200,
+        headers
+      );
+    }
+    const list = await vaultCall(env, "/passkeys") || { items: [] };
+    return json(
+      {
+        publicKey: {
+          challenge,
+          rpId,
+          timeout: 6e4,
+          userVerification: "preferred",
+          allowCredentials: (list.items || []).map((k) => ({ type: "public-key", id: k.id }))
+        }
+      },
+      200,
+      headers
+    );
+  }
+  if (path === "/passkey/register" && request.method === "POST") {
+    if (!authed && !tokenOk) return json({ error: "需要先通过令牌验证" }, 403);
+    const body = await request.json().catch(() => ({}));
+    const chal = await unsign(cfg.apiSecret, cookie(request, "vw-chal"));
+    if (!chal || chal.mode !== "register") return json({ error: "挑战已失效，请重试" }, 400);
+    try {
+      const reg = await verifyRegistration({
+        payload: body.response || {},
+        challenge: chal.c,
+        origin,
+        rpId
+      });
+      await vaultPost(env, "/passkey", {
+        id: reg.credentialId,
+        jwk: reg.jwk,
+        alg: reg.alg,
+        signCount: reg.signCount,
+        name: String(body.name || "").slice(0, 40)
+      });
+      const sess = await sign(cfg.apiSecret, { role: "admin", exp: Date.now() + SESSION_TTL });
+      return json({ ok: true, credentialId: reg.credentialId }, 200, {
+        "set-cookie": setCookie("vw-sess", sess, SESSION_TTL)
+      });
+    } catch (err) {
+      return json({ error: String(err.message || err) }, 400);
+    }
+  }
+  if (path === "/passkey/login" && request.method === "POST") {
+    const body = await request.json().catch(() => ({}));
+    const chal = await unsign(cfg.apiSecret, cookie(request, "vw-chal"));
+    if (!chal || chal.mode !== "login") return json({ error: "挑战已失效，请重试" }, 400);
+    const id = String(body.id || "");
+    const rec = await vaultCall(env, `/passkey?id=${encodeURIComponent(id)}`);
+    const key = rec && rec.item;
+    if (!key) return json({ error: "这台设备上还没有注册过的 passkey" }, 404);
+    try {
+      const res = await verifyAssertion({
+        payload: body.response || {},
+        challenge: chal.c,
+        origin,
+        rpId,
+        jwk: JSON.parse(key.jwk),
+        alg: key.alg
+      });
+      await vaultPost(env, "/passkey/counter", { id, signCount: res.signCount });
+      const sess = await sign(cfg.apiSecret, { role: "admin", exp: Date.now() + SESSION_TTL });
+      return json({ ok: true }, 200, { "set-cookie": setCookie("vw-sess", sess, SESSION_TTL) });
+    } catch (err) {
+      return json({ error: String(err.message || err) }, 400);
+    }
+  }
+  if (path === "/token" && request.method === "POST") {
+    const body = await request.json().catch(() => ({}));
+    const token = String(body.token || "");
+    if (!cfg.adminToken || token !== cfg.adminToken) return json({ error: "令牌不正确" }, 403);
+    const sess = await sign(cfg.apiSecret, { role: "admin", exp: Date.now() + CHALLENGE_TTL });
+    return json({ ok: true }, 200, { "set-cookie": setCookie("vw-sess", sess, CHALLENGE_TTL) });
+  }
+  if (!authed && !tokenOk) return json({ error: "未登录" }, 401);
+  if (path === "/logout" && request.method === "POST") {
+    return json({ ok: true }, 200, { "set-cookie": setCookie("vw-sess", "", 1) });
+  }
+  if (path === "/list" && request.method === "GET") {
+    const [danmaku, uploads] = await Promise.all([
+      vaultCall(env, "/danmaku?limit=200&all=1"),
+      vaultCall(env, "/uploads?limit=200&all=1")
+    ]);
+    return json({ danmaku: danmaku && danmaku.items || [], uploads: uploads && uploads.items || [] });
+  }
+  if (path === "/delete" && request.method === "POST") {
+    const body = await request.json().catch(() => ({}));
+    const id = String(body.id || "");
+    if (!id) return json({ error: "缺少 id" }, 400);
+    if (body.kind === "danmaku") {
+      await vaultPost(env, "/danmaku/remove", { id });
+      return json({ ok: true });
+    }
+    if (body.kind === "upload") {
+      await vaultPost(env, "/uploads/remove", { id });
+      if (env.UPLOADS) await env.UPLOADS.delete(`img:${id}`);
+      return json({ ok: true });
+    }
+    return json({ error: "kind 非法" }, 400);
+  }
+  if (path === "/passkey/remove" && request.method === "POST") {
+    const body = await request.json().catch(() => ({}));
+    await vaultPost(env, "/passkey/remove", { id: String(body.id || "") });
+    return json({ ok: true });
+  }
+  return notFound();
+}
 
 // assets/naiwa.jpg
 var naiwa_default = __toBinary("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");
@@ -938,7 +1749,7 @@ function safeEqual(a, b) {
   for (let i = 0; i < a.length; i += 1) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
   return diff === 0;
 }
-function randomId(bytes = 16) {
+function randomId2(bytes = 16) {
   const buf = crypto.getRandomValues(new Uint8Array(bytes));
   let binary = "";
   for (const byte of buf) binary += String.fromCharCode(byte);
@@ -953,7 +1764,7 @@ function intOr(value, fallback) {
   const n = Number.parseInt(value ?? "", 10);
   return Number.isFinite(n) ? n : fallback;
 }
-function json(body, status = 200) {
+function json2(body, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
     headers: { "content-type": "application/json; charset=utf-8" }
@@ -982,28 +1793,194 @@ var Counter = class {
       case "/visit": {
         const { isNewVisitor } = recordVisit(this.stats, ctx);
         await this.#persist();
-        return json({ ...viewStats(this.stats, ctx), isNewVisitor });
+        return json2({ ...viewStats(this.stats, ctx), isNewVisitor });
       }
       case "/click": {
         recordClick(this.stats, ctx);
         await this.#persist();
-        return json(viewStats(this.stats, ctx));
+        return json2(viewStats(this.stats, ctx));
       }
       case "/stats": {
-        return json(viewStats(this.stats, ctx));
+        return json2(viewStats(this.stats, ctx));
       }
       case "/reset": {
         this.stats = createStats(now);
         await this.#persist();
-        return json(viewStats(this.stats, ctx));
+        return json2(viewStats(this.stats, ctx));
       }
       default: {
-        return json({ error: "not_found" }, 404);
+        return json2({ error: "not_found" }, 404);
       }
     }
   }
   #persist() {
     return this.state.storage.put(STORAGE_KEY, this.stats);
+  }
+};
+
+// src/vault.js
+var DDL = [
+  `CREATE TABLE IF NOT EXISTS danmaku (
+     id TEXT PRIMARY KEY, text TEXT NOT NULL, color TEXT NOT NULL, size INTEGER NOT NULL,
+     created INTEGER NOT NULL, iphash TEXT NOT NULL, hidden INTEGER NOT NULL DEFAULT 0
+   )`,
+  `CREATE INDEX IF NOT EXISTS danmaku_created ON danmaku (created DESC)`,
+  `CREATE TABLE IF NOT EXISTS uploads (
+     id TEXT PRIMARY KEY, mime TEXT NOT NULL, bytes INTEGER NOT NULL, created INTEGER NOT NULL,
+     iphash TEXT NOT NULL, title TEXT NOT NULL DEFAULT '', hidden INTEGER NOT NULL DEFAULT 0
+   )`,
+  `CREATE INDEX IF NOT EXISTS uploads_created ON uploads (created DESC)`,
+  `CREATE TABLE IF NOT EXISTS passkeys (
+     id TEXT PRIMARY KEY, jwk TEXT NOT NULL, alg INTEGER NOT NULL,
+     signcount INTEGER NOT NULL DEFAULT 0, created INTEGER NOT NULL, name TEXT NOT NULL DEFAULT ''
+   )`
+];
+var MAX_DANMAKU = 400;
+var json3 = (body, status = 200) => new Response(JSON.stringify(body), {
+  status,
+  headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" }
+});
+var Vault = class {
+  constructor(state) {
+    this.state = state;
+    this.sql = state.storage.sql;
+    this.ready = state.blockConcurrencyWhile(async () => {
+      for (const ddl of DDL) this.sql.exec(ddl);
+    });
+  }
+  async fetch(request) {
+    await this.ready;
+    const url = new URL(request.url);
+    const path = url.pathname;
+    try {
+      if (request.method === "POST") {
+        const body = await request.json().catch(() => ({}));
+        switch (path) {
+          case "/danmaku":
+            return this.addDanmaku(body);
+          case "/danmaku/remove":
+            return this.removeDanmaku(body);
+          case "/upload":
+            return this.addUpload(body);
+          case "/uploads/remove":
+            return this.removeUpload(body);
+          case "/passkey":
+            return this.addPasskey(body);
+          case "/passkey/counter":
+            this.sql.exec("UPDATE passkeys SET signcount = ? WHERE id = ?", Number(body.signCount) || 0, String(body.id));
+            return json3({ ok: true });
+          case "/passkey/remove":
+            this.sql.exec("DELETE FROM passkeys WHERE id = ?", String(body.id));
+            return json3({ ok: true });
+          default:
+            return json3({ error: "unknown" }, 404);
+        }
+      }
+      switch (path) {
+        case "/danmaku":
+          return this.listDanmaku(url);
+        case "/uploads":
+          return this.listUploads(url);
+        case "/passkeys":
+          return json3({ items: this.sql.exec("SELECT id, name, created FROM passkeys ORDER BY created ASC").toArray() });
+        case "/passkey": {
+          const rows = this.sql.exec("SELECT * FROM passkeys WHERE id = ?", url.searchParams.get("id") || "").toArray();
+          return json3({ item: rows[0] || null });
+        }
+        case "/stats":
+          return json3({
+            danmaku: this.sql.exec("SELECT COUNT(*) AS n FROM danmaku").one().n,
+            uploads: this.sql.exec("SELECT COUNT(*) AS n FROM uploads").one().n,
+            passkeys: this.sql.exec("SELECT COUNT(*) AS n FROM passkeys").one().n
+          });
+        default:
+          return json3({ error: "unknown" }, 404);
+      }
+    } catch (err) {
+      return json3({ error: String(err && err.message ? err.message : err) }, 500);
+    }
+  }
+  /* ------------------------------------------------------------ 弹幕 */
+  addDanmaku(body) {
+    const text2 = String(body.text || "").trim().slice(0, 60);
+    const color = /^#[0-9a-f]{6}$/i.test(String(body.color || "")) ? String(body.color).toLowerCase() : "#f5f5f7";
+    const size = Math.min(28, Math.max(12, Number(body.size) || 15));
+    const iphash = String(body.iphash || "").slice(0, 64);
+    const now = Date.now();
+    if (!text2) return json3({ error: "内容为空" }, 400);
+    const recent = this.sql.exec("SELECT COUNT(*) AS n FROM danmaku WHERE iphash = ? AND created > ?", iphash, now - 6e4).one().n;
+    if (recent >= 3) return json3({ error: "发送太快，稍等一下" }, 429);
+    const id = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
+    this.sql.exec(
+      "INSERT INTO danmaku (id, text, color, size, created, iphash, hidden) VALUES (?, ?, ?, ?, ?, ?, 0)",
+      id,
+      text2,
+      color,
+      size,
+      now,
+      iphash
+    );
+    this.sql.exec(
+      "DELETE FROM danmaku WHERE id IN (SELECT id FROM danmaku ORDER BY created DESC LIMIT -1 OFFSET ?)",
+      MAX_DANMAKU
+    );
+    return json3({ ok: true, item: { id, text: text2, color, size, created: now } });
+  }
+  listDanmaku(url) {
+    const limit = Math.min(200, Math.max(1, Number(url.searchParams.get("limit")) || 60));
+    const all = url.searchParams.get("all") === "1";
+    const where = all ? "" : "WHERE hidden = 0";
+    const items = this.sql.exec(`SELECT id, text, color, size, created FROM danmaku ${where} ORDER BY created DESC LIMIT ?`, limit).toArray();
+    return json3({ items: items.reverse() });
+  }
+  removeDanmaku(body) {
+    this.sql.exec("DELETE FROM danmaku WHERE id = ?", String(body.id || ""));
+    return json3({ ok: true });
+  }
+  /* ------------------------------------------------------------ 图片 */
+  addUpload(body) {
+    const id = String(body.id || "");
+    if (!/^[a-z0-9]{16,32}$/.test(id)) return json3({ error: "id 非法" }, 400);
+    const iphash = String(body.iphash || "").slice(0, 64);
+    const now = Date.now();
+    const recent = this.sql.exec("SELECT COUNT(*) AS n FROM uploads WHERE iphash = ? AND created > ?", iphash, now - 36e5).one().n;
+    if (recent >= 8) return json3({ error: "上传太频繁，一小时后再试" }, 429);
+    this.sql.exec(
+      "INSERT INTO uploads (id, mime, bytes, created, iphash, title, hidden) VALUES (?, ?, ?, ?, ?, ?, 0)",
+      id,
+      String(body.mime || "image/jpeg"),
+      Number(body.bytes) || 0,
+      now,
+      iphash,
+      String(body.title || "").slice(0, 60)
+    );
+    return json3({ ok: true, item: { id, mime: body.mime, bytes: Number(body.bytes) || 0, created: now } });
+  }
+  listUploads(url) {
+    const limit = Math.min(200, Math.max(1, Number(url.searchParams.get("limit")) || 60));
+    const all = url.searchParams.get("all") === "1";
+    const where = all ? "" : "WHERE hidden = 0";
+    const items = this.sql.exec(`SELECT id, mime, bytes, created, title FROM uploads ${where} ORDER BY created DESC LIMIT ?`, limit).toArray();
+    return json3({ items });
+  }
+  removeUpload(body) {
+    this.sql.exec("DELETE FROM uploads WHERE id = ?", String(body.id || ""));
+    return json3({ ok: true });
+  }
+  /* ---------------------------------------------------------- passkey */
+  addPasskey(body) {
+    const id = String(body.id || "");
+    if (!id || !body.jwk) return json3({ error: "参数不全" }, 400);
+    this.sql.exec(
+      "INSERT OR REPLACE INTO passkeys (id, jwk, alg, signcount, created, name) VALUES (?, ?, ?, ?, ?, ?)",
+      id,
+      JSON.stringify(body.jwk),
+      Number(body.alg) || -7,
+      Number(body.signCount) || 0,
+      Date.now(),
+      String(body.name || "这台电脑").slice(0, 40)
+    );
+    return json3({ ok: true, id });
   }
 };
 
@@ -1022,7 +1999,7 @@ var index_default = {
     try {
       return await route(request, env, ctx);
     } catch {
-      return notFound();
+      return notFound2();
     }
   }
 };
@@ -1039,17 +2016,26 @@ async function route(request, env, ctx) {
   const gallery = /^\/gallery\/([1-6])\.jpg$/.exec(url.pathname);
   if (gallery) return galleryImage(Number(gallery[1]));
   const paths = await derivePaths(cfg.secret);
+  if (url.pathname === "/admin") return handleAdminPage();
+  if (url.pathname.startsWith("/admin/api/")) return handleAdminApi(request, env, url, cfg);
+  if (url.pathname === "/api/wall") return handleWallGet(env);
+  if (url.pathname === "/api/wall/danmaku" && request.method === "POST") return handleDanmakuPost(request, env, url, cfg);
+  if (url.pathname === "/api/wall/upload" && request.method === "POST") return handleUploadPost(request, env, url, cfg);
+  {
+    const img = /^\/img\/([a-z0-9]{16,32})$/.exec(url.pathname);
+    if (img) return handleImageGet(env, url, img[1]);
+  }
   const action = paths.byPath.get(url.pathname);
-  if (!action) return notFound();
+  if (!action) return notFound2();
   const store = createStore(env);
   const params = { now: Date.now(), tz: cfg.tz, span: SPAN };
   switch (action) {
     case "v":
       return handleVisit(request, cfg, store, params);
     case "s":
-      return await isTrusted(request, cfg) ? json2(ordinalView(await readStats(store, params))) : notFound();
+      return await isTrusted(request, cfg) ? json4(ordinalView(await readStats(store, params))) : notFound2();
     case "c":
-      return await isTrusted(request, cfg) ? handleClick(store, params) : notFound();
+      return await isTrusted(request, cfg) ? handleClick(store, params) : notFound2();
     case "g":
       return handleGo(cfg, store, params, ctx);
     case "r":
@@ -1057,9 +2043,9 @@ async function route(request, env, ctx) {
     case "h":
       return handleHealth(request, cfg, store, url, paths);
     case "b":
-      return cfg.badge ? handleBadge(url, store, params) : notFound();
+      return cfg.badge ? handleBadge(url, store, params) : notFound2();
     default:
-      return notFound();
+      return notFound2();
   }
 }
 function config(env) {
@@ -1079,6 +2065,7 @@ function config(env) {
     auto: clampInt(env?.AUTO_REDIRECT, 0, 0, 300),
     minInterval: clampInt(env?.MIN_INTERVAL_MS, 1200, 0, 6e4),
     adminToken: text(env?.ADMIN_TOKEN, "", 200),
+    apiSecret: text(env?.API_SECRET, "", 200),
     mailZone: text(env?.MAIL_ZONE_LABEL, "", 120) || new URL(target).host,
     mailDest: text(env?.MAIL_FORWARD_TO, "", 120),
     mailDash: text(env?.MAIL_DASH_URL, "", 300),
@@ -1110,7 +2097,7 @@ function truthy(value) {
 }
 async function servePage(cfg) {
   const paths = await derivePaths(cfg.secret);
-  const nonce = randomId(16);
+  const nonce = randomId2(16);
   const token = await mintToken(cfg.secret, Date.now(), SIGN_WINDOW_S);
   const payload = JSON.stringify({
     t: cfg.target,
@@ -1163,7 +2150,7 @@ async function probeMx(zone, disabled) {
   return value;
 }
 async function serveMailPage(cfg, url) {
-  const nonce = randomId(16);
+  const nonce = randomId2(16);
   const mx = await probeMx(url.hostname.replace(/^mail\./, ""), cfg.mailProbeOff);
   const dest = cfg.mailDest ? maskAddress(cfg.mailDest) : "未配置转发目标";
   const html = mail_default.replaceAll("{{TITLE}}", escapeHtml(cfg.title)).replaceAll("{{NONCE}}", nonce).replaceAll("{{ZONE}}", escapeHtml(cfg.mailZone)).replaceAll("{{DEST}}", escapeHtml(dest)).replaceAll("{{MX_TEXT}}", escapeHtml(mx.text)).replaceAll("{{MX_CLASS}}", escapeHtml(mx.cls)).replaceAll("{{DASH_URL}}", escapeHtml(cfg.mailDash));
@@ -1186,21 +2173,21 @@ function maskAddress(address) {
   return local.slice(0, 4) + "****" + local.slice(-2) + domain;
 }
 async function handleVisit(request, cfg, store, params) {
-  if (!await isTrusted(request, cfg)) return notFound();
+  if (!await isTrusted(request, cfg)) return notFound2();
   const { uid, fresh } = ensureUid(request);
   const uidHash = await hashUid(uid);
   const throttled = shouldThrottle(clientIp(request), params.now, cfg.minInterval);
   const view = store.mode === "none" ? emptyView(params) : throttled ? await store.stats({ ...params, uidHash }) : await store.visit({ ...params, uidHash });
   const headers = new Headers({ "cache-control": "no-store" });
   if (fresh) headers.append("set-cookie", uidCookie(uid));
-  return json2({ ...ordinalView(view), counted: store.mode !== "none" && !throttled, isNewVisitor: view.isNewVisitor }, 200, headers);
+  return json4({ ...ordinalView(view), counted: store.mode !== "none" && !throttled, isNewVisitor: view.isNewVisitor }, 200, headers);
 }
 function ordinalView(view) {
   return { configured: view.configured, uv: view.uv, first: view.first };
 }
 async function handleClick(store, params) {
-  if (store.mode === "none") return json2(emptyView(params));
-  return json2(await store.click(params));
+  if (store.mode === "none") return json4(emptyView(params));
+  return json4(await store.click(params));
 }
 async function readStats(store, params) {
   return store.mode === "none" ? emptyView(params) : store.stats(params);
@@ -1218,17 +2205,17 @@ async function handleGo(cfg, store, params, ctx) {
   });
 }
 async function handleReset(request, cfg, store, params) {
-  if (!cfg.adminToken) return notFound();
-  if (request.method !== "POST") return notFound();
-  if (!safeEqual(adminTokenOf(request), cfg.adminToken)) return notFound();
+  if (!cfg.adminToken) return notFound2();
+  if (request.method !== "POST") return notFound2();
+  if (!safeEqual(adminTokenOf(request), cfg.adminToken)) return notFound2();
   const view = await store.reset(params);
-  return json2({ ok: true, ...view });
+  return json4({ ok: true, ...view });
 }
 async function handleHealth(request, cfg, store, url, paths) {
-  if (!cfg.adminToken) return notFound();
-  if (!safeEqual(adminTokenOf(request), cfg.adminToken)) return notFound();
+  if (!cfg.adminToken) return notFound2();
+  if (!safeEqual(adminTokenOf(request), cfg.adminToken)) return notFound2();
   const view = await readStats(store, { now: Date.now(), tz: cfg.tz, span: SPAN });
-  return json2({
+  return json4({
     ok: true,
     version: VERSION,
     mode: store.mode,
@@ -1310,7 +2297,7 @@ function adminTokenOf(request) {
 function ensureUid(request) {
   const existing = readCookie(request.headers.get("cookie"), COOKIE_NAME);
   if (existing && UID_PATTERN.test(existing)) return { uid: existing, fresh: false };
-  return { uid: randomId(16), fresh: true };
+  return { uid: randomId2(16), fresh: true };
 }
 function uidCookie(uid) {
   return [
@@ -1348,10 +2335,10 @@ function shouldThrottle(ip, now, minInterval) {
 function formatNumber(n) {
   return Number(n || 0).toLocaleString("en-US");
 }
-function notFound() {
+function notFound2() {
   return new Response(null, { status: 404, headers: { "cache-control": "no-store" } });
 }
-function json2(body, status = 200, extra = {}) {
+function json4(body, status = 200, extra = {}) {
   return new Response(JSON.stringify(body), {
     status,
     headers: {
@@ -1371,7 +2358,7 @@ function escapeXml(s) {
 var GALLERY_BYTES = [__default, __default2, __default3, __default4, __default5, __default6];
 function galleryImage(index) {
   const raw = GALLERY_BYTES[index - 1];
-  if (!raw) return notFound();
+  if (!raw) return notFound2();
   const bytes = raw instanceof ArrayBuffer ? new Uint8Array(raw) : raw;
   return new Response(bytes, {
     headers: {
@@ -1403,5 +2390,6 @@ function icon(module, contentType) {
 }
 export {
   Counter,
+  Vault,
   index_default as default
 };

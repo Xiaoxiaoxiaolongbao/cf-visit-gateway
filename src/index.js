@@ -20,6 +20,14 @@
 
 import PAGE from "./page.html";
 import MAIL_PAGE from "./mail.html";
+import {
+  handleWallGet,
+  handleDanmakuPost,
+  handleUploadPost,
+  handleImageGet,
+  handleAdminPage,
+  handleAdminApi,
+} from "./wall.js";
 import NAIWA_BYTES from "../assets/naiwa.jpg";
 import GALLERY_1 from "../assets/gallery/1.jpg";
 import GALLERY_2 from "../assets/gallery/2.jpg";
@@ -34,6 +42,7 @@ import { emptyView } from "./stats.js";
 import { DEFAULT_SECRET, derivePaths, mintToken, randomId, safeEqual, verifyToken } from "./secret.js";
 
 export { Counter } from "./durable.js";
+export { Vault } from "./vault.js";
 
 const VERSION = "1.0.0";
 
@@ -78,6 +87,17 @@ async function route(request, env, ctx) {
   if (gallery) return galleryImage(Number(gallery[1]));
 
   const paths = await derivePaths(cfg.secret);
+  // ---- 留言墙 / 上传 / 管理台（公开读、公开写、鉴权管理） ----
+  if (url.pathname === "/admin") return handleAdminPage();
+  if (url.pathname.startsWith("/admin/api/")) return handleAdminApi(request, env, url, cfg);
+  if (url.pathname === "/api/wall") return handleWallGet(env);
+  if (url.pathname === "/api/wall/danmaku" && request.method === "POST") return handleDanmakuPost(request, env, url, cfg);
+  if (url.pathname === "/api/wall/upload" && request.method === "POST") return handleUploadPost(request, env, url, cfg);
+  {
+    const img = /^\/img\/([a-z0-9]{16,32})$/.exec(url.pathname);
+    if (img) return handleImageGet(env, url, img[1]);
+  }
+
   const action = paths.byPath.get(url.pathname);
   if (!action) return notFound();
 
@@ -127,6 +147,7 @@ function config(env) {
     auto: clampInt(env?.AUTO_REDIRECT, 0, 0, 300),
     minInterval: clampInt(env?.MIN_INTERVAL_MS, 1200, 0, 60000),
     adminToken: text(env?.ADMIN_TOKEN, "", 200),
+    apiSecret: text(env?.API_SECRET, "", 200),
     mailZone: text(env?.MAIL_ZONE_LABEL, "", 120) || new URL(target).host,
     mailDest: text(env?.MAIL_FORWARD_TO, "", 120),
     mailDash: text(env?.MAIL_DASH_URL, "", 300),
