@@ -43,6 +43,13 @@
   .steps li.active::before { color: var(--fg); border-color: var(--fg); }
   .steps b { display: block; font-weight: 500; font-size: 13.5px; margin-bottom: 8px; }
   .steps .hint { color: var(--soft); font-size: 12px; margin: 6px 0 0; }
+  .next {
+    margin: 0 0 16px; padding: 11px 14px; border-radius: 10px;
+    background: rgba(255,255,255,.04); border: 1px solid var(--hair);
+    font-size: 12.5px; color: var(--fg); letter-spacing: .01em;
+  }
+  .next.done { border-color: rgba(63,168,106,.35); color: var(--ok); }
+  .next.act { border-color: var(--hair2); }
   .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
   button {
     font: inherit; font-size: 13px; padding: 9px 18px; border-radius: 980px; cursor: pointer;
@@ -92,6 +99,7 @@
 
   <section class="card" id="bind-card">
     <h2>绑定这台电脑</h2>
+    <p class="next" id="next-action">正在读取状态…</p>
     <ol class="steps">
       <li id="step1" class="active">
         <b>第 1 步 · 输入一次管理令牌</b>
@@ -104,7 +112,7 @@
       <li id="step2">
         <b>第 2 步 · 添加这台电脑的 passkey</b>
         <div class="row">
-          <button class="primary" id="btn-register" type="button" disabled>添加这台电脑的 passkey</button>
+          <button class="primary" id="btn-register" type="button">添加这台电脑的 passkey</button>
           <button id="btn-login" type="button" class="hide">用已有的 passkey 登录</button>
         </div>
         <p class="hint" id="step2-hint">先完成第 1 步（输入令牌）才能绑定。</p>
@@ -201,9 +209,26 @@
     }
 
     const hasKey = state.passkeys.length > 0;
-    $("domain-label") && ($("domain-label").textContent = state.rpId || location.hostname);
+    const label = $("domain-label");
+    if (label) label.textContent = state.rpId || location.hostname;
 
     $("bind-card").classList.toggle("hide", state.authed && hasKey);
+
+    // 单一出口：现在该做什么，只有这里算
+    const next = $("next-action");
+    if (state.authed && hasKey) {
+      next.textContent = "全部完成：这台电脑已可用 passkey 一键登录。";
+      next.className = "next done";
+    } else if (!state.authed && hasKey) {
+      next.textContent = "这台电脑已经绑定过 passkey —— 现在该做：点下面的「用已有的 passkey 登录」。";
+      next.className = "next act";
+    } else if (!state.authed && !hasKey) {
+      next.textContent = "现在该做第 1 步：把管理令牌粘进下面输入框，点「验证令牌」。验证通过后会自动接着弹 Windows Hello。";
+      next.className = "next act";
+    } else {
+      next.textContent = "令牌已通过，现在该做第 2 步：点「添加这台电脑的 passkey」，在系统窗口里确认一次。";
+      next.className = "next act";
+    }
 
     const step1 = $("step1");
     step1.classList.toggle("done", state.authed);
@@ -216,8 +241,10 @@
     const step2 = $("step2");
     step2.classList.toggle("done", hasKey);
     step2.classList.toggle("active", state.authed && !hasKey);
-    $("btn-register").disabled = !state.authed;
+    $("btn-register").disabled = false;
     $("btn-register").textContent = hasKey ? "再添加一个 passkey" : "添加这台电脑的 passkey";
+    $("btn-register").classList.toggle("primary", state.authed || hasKey);
+    $("btn-login").classList.toggle("primary", !state.authed && hasKey);
     $("btn-login").classList.toggle("hide", !hasKey || state.authed);
     if (!state.authed) {
       $("step2-hint").textContent = "先完成第 1 步（输入令牌）才能绑定。";
@@ -261,13 +288,22 @@
     return out;
   }
 
-  async function register() {
+  let busy = false;
+
+  async function register(auto) {
+    if (busy) return;
+    if (!state.authed) {
+      say("bind-status", "还没验证令牌：先把令牌粘进第 1 步的输入框，点「验证令牌」，我会自动接着走这一步。", "warn");
+      const input = $("token-input");
+      if (input) input.focus();
+      return;
+    }
     if (!window.PublicKeyCredential) {
       say("bind-status", "这个浏览器不支持 passkey（需要较新的 Chrome / Edge / Safari）。", "err");
       return;
     }
-    say("bind-status", "正在请求系统验证…", "warn");
-    $("btn-register").disabled = true;
+    busy = true;
+    say("bind-status", auto ? "令牌已通过，正在弹出系统验证窗口…" : "正在请求系统验证…", "warn");
     try {
       const opts = await api("/passkey/options", { method: "POST", body: { mode: "register" } });
       const pk = opts.publicKey;
@@ -283,7 +319,8 @@
       await refresh();
     } catch (err) {
       say("bind-status", "绑定失败：" + explain(err), "err");
-      $("btn-register").disabled = false;
+    } finally {
+      busy = false;
     }
   }
 
@@ -311,8 +348,10 @@
     try {
       await api("/token", { method: "POST", body: { token } });
       $("token-input").value = "";
-      say("bind-status", "令牌通过 ✓ 现在做第 2 步：点「添加这台电脑的 passkey」", "ok");
+      say("bind-status", "令牌通过 ✓ 正在接着弹出系统验证窗口…", "ok");
       await refresh();
+      // 用户刚点过按钮，仍处于用户激活期内，直接进入注册可以省掉第二次点击
+      await register(true);
     } catch (err) {
       say("bind-status", "令牌验证失败：" + explain(err), "err");
     }
@@ -389,7 +428,7 @@
 
   $("btn-token").addEventListener("click", tokenLogin);
   $("token-input").addEventListener("keydown", (e) => { if (e.key === "Enter") tokenLogin(); });
-  $("btn-register").addEventListener("click", register);
+  $("btn-register").addEventListener("click", () => register(false));
   $("btn-login").addEventListener("click", login);
   $("btn-logout").addEventListener("click", async () => {
     await api("/logout", { method: "POST" }).catch(() => {});

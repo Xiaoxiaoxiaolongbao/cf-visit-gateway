@@ -80,6 +80,9 @@ await it("管理台：/admin 返回页面，且带 noindex", async () => {
   const html = await res.text();
   assert.ok(html.includes("管理台"));
   assert.ok(html.includes("passkey"));
+  assert.ok(html.includes('id="next-action"'), "应有「现在该做」这一行");
+  assert.ok(html.includes("await register(true)"), "令牌通过后应自动继续绑定");
+  assert.ok(!/id="btn-register"[^>]*disabled/.test(html), "绑定按钮不应被禁用");
 });
 
 await it("管理台接口：未登录时 session 为 false、list 为 401", async () => {
