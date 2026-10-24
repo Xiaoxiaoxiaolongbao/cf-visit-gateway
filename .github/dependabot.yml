@@ -1,0 +1,39 @@
+version: 2
+
+# 依赖更新：带 automerge 标签，由 .github/workflows/auto-merge.yml 自动合并
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Shanghai
+    open-pull-requests-limit: 3
+    labels:
+      - automerge
+    commit-message:
+      prefix: deps
+    groups:
+      wrangler:
+        patterns:
+          - wrangler
+          - "@cloudflare/*"
+      others:
+        patterns:
+          - "*"
+        exclude-patterns:
+          - wrangler
+          - "@cloudflare/*"
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Shanghai
+    labels:
+      - automerge
+    commit-message:
+      prefix: ci

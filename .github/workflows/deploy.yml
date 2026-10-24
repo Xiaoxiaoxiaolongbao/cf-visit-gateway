@@ -3,6 +3,10 @@ name: Deploy to Cloudflare Workers
 on:
   push:
     branches: [main]
+  # PR 也跑一遍「测试 / 审计 / 打包」：它是分支保护里的必需检查，
+  # 自动合并（auto-merge）要等它变绿。部署作业只在 push 时执行。
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
@@ -68,7 +72,7 @@ jobs:
   deploy:
     name: 部署 Worker
     needs: preflight
-    if: needs.preflight.outputs.ready == 'true'
+    if: needs.preflight.outputs.ready == 'true' && github.event_name == 'push'
     runs-on: ubuntu-latest
     environment: production
     steps:

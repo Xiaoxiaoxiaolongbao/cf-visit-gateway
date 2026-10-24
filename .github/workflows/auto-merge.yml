@@ -1,0 +1,35 @@
+name: Auto merge
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, labeled, ready_for_review]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: automerge-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  enable:
+    name: 开启自动合并
+    # 只对「带 automerge 标签」或「dependabot 发起」的非草稿 PR 生效
+    if: |
+      github.event.pull_request.draft == false && (
+        contains(github.event.pull_request.labels.*.name, 'automerge') ||
+        github.actor == 'dependabot[bot]'
+      )
+    runs-on: ubuntu-latest
+    steps:
+      - name: gh pr merge --auto --squash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          gh pr merge "$PR_NUMBER" \
+            --repo "${{ github.repository }}" \
+            --squash --auto --delete-branch \
+          && echo "已开启自动合并：等「测试 / 审计 / 打包」通过后自动 squash 合入并删除分支" \
+          || echo "::notice title=自动合并未开启::可能已开启过，或仓库未允许 auto-merge"
