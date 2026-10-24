@@ -550,6 +550,31 @@ var page_default = `<!DOCTYPE html>
     <p class="upload-note">上传后会出现在上方「奶蛙中学风采 · 自主上传」里，任何人可见；管理员可在 /admin 删除。</p>
   </section>
 </main>
+
+  <div class="confirm" id="up-confirm" role="dialog" aria-modal="true" aria-labelledby="up-confirm-title" hidden>
+    <div class="confirm-scrim" data-cancel></div>
+    <div class="confirm-panel">
+      <h2 id="up-confirm-title">确认上传</h2>
+      <p class="confirm-note">您正在上传照片，如有违规内容会被拦截，并限制您的上传。</p>
+      <p class="confirm-consent">上传即同意<button class="linkbtn" id="open-terms" type="button">《用户协议》</button></p>
+      <details class="terms" id="terms-box">
+        <summary>用户协议（点击展开）</summary>
+        <ol>
+          <li><b>公开范围</b>：你上传的图片会出现在「奶蛙中学风采 · 自主上传」中，发送的弹幕会在首页飘过，均对所有人可见。</li>
+          <li><b>内容规范</b>：不得上传或发布引战、谩骂、侮辱、歧视、色情、暴力、违法内容，以及侵犯他人肖像权、著作权等权益的内容。</li>
+          <li><b>管理员处置权</b>：管理员有权对引战、谩骂等不良图片与弹幕直接删除，并可视情节限制该来源继续上传。</li>
+          <li><b>记录范围</b>：为便于审核与追溯，管理员会对每一条信息记录发送者的 <b>IP 地址</b>、<b>浏览器指纹</b>、<b>设备指纹</b>，以及与该信息相关的合法内容（时间、正文、颜色字号、图片类型与大小等）。</li>
+          <li><b>记录用途</b>：上述记录仅用于内容审核、违规处理与必要的责任追溯，不会对外公开，也不会用于广告投放。</li>
+          <li><b>违规后果</b>：违规内容将被删除；对同一来源，管理员可将其 IP 加入黑名单，限制其上传图片。</li>
+          <li><b>协议变更</b>：本协议可能更新，更新后继续使用即视为接受新版本。</li>
+        </ol>
+      </details>
+      <div class="confirm-actions">
+        <button id="up-cancel" type="button">取消</button>
+        <button id="up-ok" class="primary" type="button">同意并上传</button>
+      </div>
+    </div>
+  </div>
   <div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-labelledby="lightbox-title" hidden>
     <div class="lightbox-scrim" data-close></div>
     <div class="lightbox-panel">
@@ -865,7 +890,7 @@ var page_default = `<!DOCTYPE html>
         send.disabled = true;
         fetch("/api/wall/danmaku", {
           method: "POST",
-          headers: { "content-type": "application/json" },
+          headers: { "content-type": "application/json", "x-bfp": fp.bfp, "x-dfp": fp.dfp },
           credentials: "same-origin",
           body: JSON.stringify({ text: value, color: picked, size: sizes[sizeIndex] }),
         })
@@ -917,16 +942,114 @@ var page_default = `<!DOCTYPE html>
       if (send) send.addEventListener("click", post);
       if (text) text.addEventListener("keydown", function (e) { if (e.key === "Enter") post(); });
 
+      /* 双指纹：仅用于事后对比，不参与任何拦截 */
+      var fp = { bfp: "", dfp: "" };
+      function hash32(str) {
+        var h = 0x811c9dc5;
+        for (var i = 0; i < str.length; i += 1) {
+          h ^= str.charCodeAt(i);
+          h = (h * 0x01000193) >>> 0;
+        }
+        return ("00000000" + h.toString(16)).slice(-8);
+      }
+      function canvasSig() {
+        try {
+          var c = document.createElement("canvas");
+          c.width = 200; c.height = 40;
+          var g = c.getContext("2d");
+          g.textBaseline = "top";
+          g.font = "16px Arial";
+          g.fillStyle = "#f60"; g.fillRect(0, 0, 100, 20);
+          g.fillStyle = "#069"; g.fillText("naiwa-fp-中", 2, 22);
+          g.strokeStyle = "rgba(0,0,0,.4)";
+          g.beginPath(); g.arc(50, 20, 15, 0, Math.PI * 2); g.stroke();
+          return c.toDataURL().slice(-140);
+        } catch (e) { return "nocanvas"; }
+      }
+      function webglSig() {
+        try {
+          var c = document.createElement("canvas");
+          var gl = c.getContext("webgl") || c.getContext("experimental-webgl");
+          if (!gl) return "nogl";
+          var ext = gl.getExtension("WEBGL_debug_renderer_info");
+          return [
+            gl.getParameter(gl.VENDOR), gl.getParameter(gl.RENDERER),
+            ext ? gl.getParameter(ext.UNMASKED_VENDOR_WEBGL) : "",
+            ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : "",
+          ].join("|");
+        } catch (e) { return "nogl"; }
+      }
+      function computeFp() {
+        try {
+          var nav = window.navigator;
+          var scr = window.screen;
+          fp.bfp = hash32([
+            nav.userAgent, nav.language, (nav.languages || []).join(","),
+            nav.plugins ? nav.plugins.length : 0, nav.hardwareConcurrency || 0,
+            (window.Intl && Intl.DateTimeFormat().resolvedOptions().timeZone) || "",
+            scr.colorDepth, canvasSig(), webglSig(),
+          ].join("~"));
+          fp.dfp = hash32([
+            scr.width, scr.height, scr.availWidth, scr.availHeight,
+            window.devicePixelRatio || 1, nav.platform || "",
+            nav.maxTouchPoints || 0, nav.deviceMemory || 0,
+            nav.hardwareConcurrency || 0,
+            nav.userAgentData && nav.userAgentData.mobile ? 1 : 0,
+          ].join("~"));
+        } catch (e) { /* 指纹算不出来也不影响上传 */ }
+      }
+      computeFp();
+
       /* 上传 */
       var zone = byId("dropzone");
       var input = byId("file-input");
+      var pending = null;
+      var confirmBox = byId("up-confirm");
+
+      function askConfirm(file) {
+        if (!file) return;
+        if (file.size > 10 * 1024 * 1024) { say("超过 10MB，换小一点的"); return; }
+        pending = file;
+        if (!confirmBox) { upload(file); return; }
+        confirmBox.hidden = false;
+        document.documentElement.style.overflow = "hidden";
+      }
+      function closeConfirm() {
+        if (confirmBox) confirmBox.hidden = true;
+        document.documentElement.style.overflow = "";
+        pending = null;
+      }
+      if (confirmBox) {
+        var okBtn = byId("up-ok");
+        var cancelBtn = byId("up-cancel");
+        var termsBtn = byId("open-terms");
+        var termsBox = byId("terms-box");
+        if (okBtn) okBtn.addEventListener("click", function () {
+          var f = pending;
+          closeConfirm();
+          if (f) upload(f);
+        });
+        if (cancelBtn) cancelBtn.addEventListener("click", closeConfirm);
+        if (termsBtn && termsBox) termsBtn.addEventListener("click", function () {
+          termsBox.open = !termsBox.open;
+          termsBox.scrollIntoView({ block: "nearest", behavior: "smooth" });
+        });
+        confirmBox.addEventListener("click", function (e) {
+          var el = e.target;
+          if (el && el.nodeType === 1 && el.hasAttribute("data-cancel")) closeConfirm();
+        });
+        document.addEventListener("keydown", function (e) {
+          if (e.key === "Escape" && !confirmBox.hidden) closeConfirm();
+        });
+      }
+
       function upload(file) {
         if (!file) return;
         if (file.size > 10 * 1024 * 1024) { say("超过 10MB，换小一点的"); return; }
         say("正在上传 " + Math.round(file.size / 1024) + " KB…");
         fetch("/api/wall/upload", {
           method: "POST",
-          headers: { "content-type": file.type || "application/octet-stream" },
+          headers: { "content-type": file.type || "application/octet-stream", "x-bfp": fp.bfp, "x-dfp": fp.dfp },
           credentials: "same-origin",
           body: file,
         })
@@ -947,7 +1070,10 @@ var page_default = `<!DOCTYPE html>
           })
           .catch(function () { say("上传出错，稍后再试"); });
       }
-      if (input) input.addEventListener("change", function () { upload(input.files && input.files[0]); });
+      if (input) input.addEventListener("change", function () {
+        askConfirm(input.files && input.files[0]);
+        input.value = "";
+      });
       if (zone) {
         ["dragenter", "dragover"].forEach(function (ev) {
           zone.addEventListener(ev, function (e) { e.preventDefault(); zone.classList.add("over"); });
@@ -957,7 +1083,7 @@ var page_default = `<!DOCTYPE html>
         });
         zone.addEventListener("drop", function (e) {
           var file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
-          upload(file);
+          askConfirm(file);
         });
       }
 
@@ -1046,7 +1172,7 @@ var page_default = `<!DOCTYPE html>
 var mail_default = '<!DOCTYPE html>\n<html lang="zh-CN">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n<meta name="color-scheme" content="dark">\n<meta name="robots" content="noindex, nofollow">\n<meta name="referrer" content="no-referrer">\n<title>邮箱 · {{TITLE}}</title>\n<link rel="icon" href="/favicon.ico" sizes="any">\n<link rel="icon" type="image/png" href="/favicon.png" sizes="64x64">\n<style nonce="{{NONCE}}">\n  :root {\n    --paper: #f5f5f7; --ink: #8a8a8f; --ink-soft: #63636a;\n    --hair: rgba(255,255,255,.085); --hair-strong: rgba(255,255,255,.16);\n    --black: #050506; --ok: #3fa86a; --warn: #d8bb62;\n    --ease: cubic-bezier(.16,1,.3,1);\n    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;\n  }\n  *, *::before, *::after { box-sizing: border-box; }\n  body {\n    margin: 0; min-height: 100svh; background: var(--black); color: var(--paper);\n    display: flex; align-items: center; justify-content: center; padding: 48px 24px;\n    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue",\n                 "PingFang SC", "Microsoft YaHei", sans-serif;\n    font-size: 15px; line-height: 1.55; -webkit-font-smoothing: antialiased;\n  }\n  body::before {\n    content: ""; position: fixed; left: 50%; top: -18vh; width: 120vw; height: 90vh;\n    transform: translateX(-50%); pointer-events: none; z-index: 0;\n    background: radial-gradient(38% 34% at 42% 12%, rgba(255,255,255,.13), transparent 68%);\n  }\n  main { position: relative; z-index: 1; width: min(560px, 100%); }\n  .seam {\n    height: 1px; margin: 0 0 30px;\n    background: linear-gradient(90deg, transparent, var(--hair-strong) 22%, var(--hair-strong) 78%, transparent);\n  }\n  .kicker {\n    margin: 0 0 26px; font-family: var(--mono); font-size: 10.5px;\n    letter-spacing: .22em; text-transform: uppercase; color: var(--ink-soft);\n  }\n  h1 { margin: 0 0 6px; font-size: 30px; font-weight: 500; letter-spacing: -.03em; }\n  .sub { margin: 0 0 34px; font-size: 14px; color: var(--ink); }\n  .addr {\n    display: block; margin: 0 0 30px; padding: 16px 18px; border: 1px solid var(--hair);\n    border-radius: 10px; font-family: var(--mono); font-size: 13px; letter-spacing: .02em;\n    color: var(--paper); word-break: break-all;\n  }\n  .addr b { color: var(--ink-soft); font-weight: 400; }\n  .rows { list-style: none; margin: 0 0 30px; padding: 0; border-top: 1px solid var(--hair); }\n  .rows li {\n    display: flex; justify-content: space-between; gap: 14px; padding: 12px 0;\n    border-bottom: 1px solid var(--hair); font-size: 13px;\n  }\n  .rows span { color: var(--ink-soft); }\n  .rows em { font-style: normal; font-family: var(--mono); font-size: 12px; color: var(--paper); }\n  .rows em.on { color: var(--ok); }\n  .rows em.off { color: var(--warn); }\n  .actions { display: flex; flex-wrap: wrap; gap: 12px; }\n  .btn {\n    display: inline-flex; align-items: center; gap: 8px; padding: 11px 22px;\n    border-radius: 980px; text-decoration: none; font-size: 14px; font-weight: 500;\n    border: 1px solid var(--hair-strong); color: var(--paper);\n    transition: background-color .2s ease, border-color .2s ease;\n  }\n  .btn:hover { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.28); }\n  .btn.primary { background: var(--paper); color: #0a0a0c; border-color: var(--paper); }\n  .btn.primary:hover { background: #fff; }\n  .note {\n    margin: 34px 0 0; padding-top: 18px; border-top: 1px solid var(--hair);\n    font-size: 12px; line-height: 1.9; color: var(--ink-soft);\n  }\n  .note code { font-family: var(--mono); font-size: 11.5px; color: var(--ink); }\n  @media (max-width: 520px) {\n    h1 { font-size: 24px; }\n    .actions { flex-direction: column; align-items: stretch; }\n    .btn { justify-content: center; }\n  }\n</style>\n</head>\n<body>\n<main>\n  <div class="seam"></div>\n  <p class="kicker">Mail &middot; {{ZONE}}</p>\n\n  <h1>学校邮箱</h1>\n  <p class="sub">任何前缀都能收，邮件转发到你的常用邮箱。</p>\n\n  <code class="addr">*@{{ZONE}} <b>&rarr;</b> {{DEST}}</code>\n\n  <ul class="rows">\n    <li><span>收件（MX 记录）</span><em class="{{MX_CLASS}}">{{MX_TEXT}}</em></li>\n    <li><span>转发目标</span><em>{{DEST}}</em></li>\n    <li><span>发件</span><em class="off">需第三方代发</em></li>\n  </ul>\n\n  <div class="actions">\n    <a class="btn primary" href="https://mail.qq.com/" target="_blank" rel="noopener noreferrer">打开 QQ 邮箱</a>\n    <a class="btn" href="{{DASH_URL}}" target="_blank" rel="noopener noreferrer">Cloudflare 邮件路由</a>\n  </div>\n\n  <p class="note">\n    收件由 Cloudflare Email Routing 免费完成：在面板启用后，MX 会自动写入 DNS，\n    随后把目标地址加进「Destination addresses」并在邮箱里点一次确认链接即可。<br>\n    发件不由本域直接投递（Cloudflare 不提供邮箱账号与 IMAP/SMTP）；\n    想在 QQ 邮箱里以 <code>@{{ZONE}}</code> 的身份回信，可在 QQ 邮箱设置里添加「其他邮箱」并用其 SMTP 代发。\n  </p>\n</main>\n</body>\n</html>\n';
 
 // src/admin.html
-var admin_default = '<!DOCTYPE html>\n<html lang="zh-CN">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n<meta name="color-scheme" content="dark">\n<meta name="robots" content="noindex, nofollow">\n<title>管理台 · 奶蛙中学</title>\n<link rel="icon" href="/favicon.ico" sizes="any">\n<style nonce="{{NONCE}}">\n  :root {\n    --bg: #050506; --fg: #f5f5f7; --ink: #8a8a8f; --soft: #63636a;\n    --hair: rgba(255,255,255,.09); --hair2: rgba(255,255,255,.18);\n    --ok: #3fa86a; --warn: #d8bb62; --err: #d98b86;\n    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;\n  }\n  *, *::before, *::after { box-sizing: border-box; }\n  body {\n    margin: 0; background: var(--bg); color: var(--fg); min-height: 100vh;\n    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Microsoft YaHei", sans-serif;\n    font-size: 14px; line-height: 1.65; -webkit-font-smoothing: antialiased;\n  }\n  .wrap { width: min(880px, 100%); margin: 0 auto; padding: 44px 24px 90px; }\n  .seam { height: 1px; background: linear-gradient(90deg, transparent, var(--hair2) 20%, var(--hair2) 80%, transparent); margin: 0 0 26px; }\n  .kicker { font-family: var(--mono); font-size: 10px; letter-spacing: .22em; text-transform: uppercase; color: var(--soft); margin: 0 0 18px; }\n  h1 { font-size: 26px; font-weight: 500; letter-spacing: -.02em; margin: 0 0 6px; }\n  .sub { color: var(--ink); margin: 0 0 26px; font-size: 13px; }\n  .card { border: 1px solid var(--hair); border-radius: 12px; padding: 20px; margin-bottom: 16px; }\n  .card h2 { font-size: 14px; font-weight: 500; margin: 0 0 14px; }\n\n  /* 三步向导 */\n  .steps { list-style: none; margin: 0; padding: 0; counter-reset: step; }\n  .steps li { position: relative; padding: 14px 0 14px 42px; border-bottom: 1px solid var(--hair); }\n  .steps li:last-child { border-bottom: 0; padding-bottom: 0; }\n  .steps li::before {\n    counter-increment: step; content: counter(step);\n    position: absolute; left: 0; top: 14px; width: 26px; height: 26px; border-radius: 50%;\n    display: flex; align-items: center; justify-content: center;\n    font-family: var(--mono); font-size: 11px; color: var(--soft);\n    border: 1px solid var(--hair2);\n  }\n  .steps li.done::before { content: "✓"; color: var(--ok); border-color: rgba(63,168,106,.5); }\n  .steps li.active::before { color: var(--fg); border-color: var(--fg); }\n  .steps b { display: block; font-weight: 500; font-size: 13.5px; margin-bottom: 8px; }\n  .steps .hint { color: var(--soft); font-size: 12px; margin: 6px 0 0; }\n  .next {\n    margin: 0 0 16px; padding: 11px 14px; border-radius: 10px;\n    background: rgba(255,255,255,.04); border: 1px solid var(--hair);\n    font-size: 12.5px; color: var(--fg); letter-spacing: .01em;\n  }\n  .next.done { border-color: rgba(63,168,106,.35); color: var(--ok); }\n  .next.act { border-color: var(--hair2); }\n  .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }\n  button {\n    font: inherit; font-size: 13px; padding: 9px 18px; border-radius: 980px; cursor: pointer;\n    border: 1px solid var(--hair2); background: transparent; color: var(--fg);\n    transition: background-color .2s ease, border-color .2s ease, opacity .2s ease;\n  }\n  button:hover:not(:disabled) { background: rgba(255,255,255,.06); }\n  button.primary { background: var(--fg); color: #0a0a0c; border-color: var(--fg); }\n  button.primary:hover:not(:disabled) { background: #fff; }\n  button.danger { border-color: rgba(217,139,134,.45); color: var(--err); }\n  button.danger:hover:not(:disabled) { background: rgba(217,139,134,.1); }\n  button:disabled { opacity: .4; cursor: not-allowed; }\n  input[type="text"], input[type="password"] {\n    font: inherit; font-size: 13px; padding: 9px 14px; border-radius: 9px; min-width: 250px;\n    border: 1px solid var(--hair2); background: rgba(255,255,255,.03); color: var(--fg);\n  }\n  input:focus { outline: 2px solid var(--hair2); outline-offset: 1px; }\n  .status { font-family: var(--mono); font-size: 11.5px; letter-spacing: .04em; margin: 14px 0 0; min-height: 18px; }\n  .status.ok { color: var(--ok); } .status.warn { color: var(--warn); } .status.err { color: var(--err); }\n  .warnbar {\n    border: 1px solid rgba(216,187,98,.35); background: rgba(216,187,98,.06); color: var(--warn);\n    border-radius: 10px; padding: 12px 14px; font-size: 12.5px; margin-bottom: 16px;\n  }\n  .tabs { display: flex; gap: 8px; margin: 0 0 14px; flex-wrap: wrap; align-items: center; }\n  .tabs button { padding: 7px 16px; font-size: 12.5px; }\n  .tabs button[aria-selected="true"] { background: rgba(255,255,255,.09); border-color: var(--hair2); }\n  .list { list-style: none; margin: 0; padding: 0; }\n  .list li { display: flex; gap: 14px; align-items: flex-start; padding: 12px 0; border-bottom: 1px solid var(--hair); }\n  .list li:last-child { border-bottom: 0; }\n  .meta { flex: 1; min-width: 0; }\n  .meta b { font-weight: 500; word-break: break-word; }\n  .meta span { display: block; font-family: var(--mono); font-size: 10.5px; color: var(--soft); letter-spacing: .04em; margin-top: 3px; }\n  .thumb { width: 64px; height: 64px; border-radius: 8px; object-fit: cover; border: 1px solid var(--hair); flex: none; }\n  .empty { color: var(--soft); font-size: 12.5px; padding: 10px 0; }\n  .hide { display: none !important; }\n  .domain { font-family: var(--mono); font-size: 11.5px; color: var(--fg); }\n</style>\n</head>\n<body>\n<div class="wrap">\n  <div class="seam"></div>\n  <p class="kicker">Admin &middot; 奶蛙中学</p>\n  <h1>管理台</h1>\n  <p class="sub">按顺序做完两步，这台电脑就能用 passkey 一键进管理台。</p>\n\n  <div id="warnbar" class="warnbar hide"></div>\n\n  <section class="card" id="bind-card">\n    <h2>绑定这台电脑</h2>\n    <p class="next" id="next-action">正在读取状态…</p>\n    <ol class="steps">\n      <li id="step1" class="active">\n        <b>第 1 步 · 输入一次管理令牌</b>\n        <div class="row" id="token-row">\n          <input type="password" id="token-input" placeholder="管理令牌" autocomplete="off">\n          <button class="primary" id="btn-token" type="button">验证令牌</button>\n        </div>\n        <p class="hint" id="step1-hint">令牌在项目根目录的 .dev.vars 文件里，也等于 Worker 上配置的那个同名 Secret。只用于这次绑定。</p>\n      </li>\n      <li id="step2">\n        <b>第 2 步 · 添加这台电脑的 passkey</b>\n        <div class="row">\n          <button class="primary" id="btn-register" type="button">添加这台电脑的 passkey</button>\n          <button id="btn-login" type="button" class="hide">用已有的 passkey 登录</button>\n        </div>\n        <p class="hint" id="step2-hint">先完成第 1 步（输入令牌）才能绑定。</p>\n      </li>\n      <li id="step3">\n        <b>第 3 步 · 完成</b>\n        <p class="hint" id="step3-hint">绑好后，以后打开这个页面点一下就能进。</p>\n      </li>\n    </ol>\n    <p class="status" id="bind-status"></p>\n  </section>\n\n  <section id="manage" class="hide">\n    <div class="tabs" role="tablist">\n      <button role="tab" aria-selected="true" data-tab="danmaku">弹幕</button>\n      <button role="tab" aria-selected="false" data-tab="uploads">图片</button>\n      <button role="tab" aria-selected="false" data-tab="keys">密钥</button>\n      <button id="btn-logout" type="button" style="margin-left:auto">退出</button>\n    </div>\n    <div class="card">\n      <ul class="list" id="list"></ul>\n      <p class="empty hide" id="empty">这里还是空的。</p>\n      <p class="status" id="panel-status"></p>\n    </div>\n  </section>\n</div>\n\n<script nonce="{{NONCE}}">\n  "use strict";\n\n  const $ = (id) => document.getElementById(id);\n  const b64u = {\n    enc(buf) {\n      const b = new Uint8Array(buf);\n      let s = "";\n      for (let i = 0; i < b.length; i += 1) s += String.fromCharCode(b[i]);\n      return btoa(s).replace(/\\+/g, "-").replace(/\\//g, "_").replace(/=+$/, "");\n    },\n    dec(str) {\n      const s = String(str).replace(/-/g, "+").replace(/_/g, "/");\n      const bin = atob(s + (s.length % 4 ? "=".repeat(4 - (s.length % 4)) : ""));\n      const out = new Uint8Array(bin.length);\n      for (let i = 0; i < bin.length; i += 1) out[i] = bin.charCodeAt(i);\n      return out;\n    },\n  };\n\n  let state = { authed: false, passkeys: [], rpId: "", vault: false, uploads: false };\n  let tab = "danmaku";\n  let cache = { danmaku: [], uploads: [] };\n\n  function say(id, text, kind) {\n    const el = $(id);\n    el.textContent = text || "";\n    el.className = "status" + (kind ? " " + kind : "");\n  }\n\n  function explain(err) {\n    const name = (err && err.name) || "";\n    if (name === "NotAllowedError") {\n      return "系统窗口被取消或超时了。再点一次；如果一直不弹出，先确认这台电脑设置过 Windows Hello（PIN / 指纹 / 人脸）。";\n    }\n    if (name === "SecurityError") {\n      return "域名不匹配：passkey 只能绑定当前域名（" + state.rpId + "）。别用 IP 或 *.workers.dev 地址访问。";\n    }\n    if (name === "InvalidStateError") {\n      return "这台设备已经注册过 passkey 了，直接点「用已有的 passkey 登录」。";\n    }\n    if (name === "NotSupportedError" || name === "ConstraintError") {\n      return "当前浏览器或系统不支持 passkey（需要 Windows Hello、Touch ID 或安全密钥）。";\n    }\n    if (name === "AbortError") return "操作被中断，重试一次。";\n    return (err && err.message) || String(err);\n  }\n\n  async function api(path, options) {\n    const res = await fetch("/admin/api" + path, {\n      method: (options && options.method) || "GET",\n      headers: { "content-type": "application/json" },\n      credentials: "same-origin",\n      body: options && options.body ? JSON.stringify(options.body) : undefined,\n    });\n    const data = await res.json().catch(() => ({}));\n    if (!res.ok) throw new Error(data.error || "HTTP " + res.status);\n    return data;\n  }\n\n  async function refresh() {\n    try {\n      state = await api("/session");\n    } catch (err) {\n      say("bind-status", "读取状态失败：" + explain(err), "err");\n      return;\n    }\n\n    const hasKey = state.passkeys.length > 0;\n    const label = $("domain-label");\n    if (label) label.textContent = state.rpId || location.hostname;\n\n    $("bind-card").classList.toggle("hide", state.authed && hasKey);\n\n    // 有 passkey 之后，令牌这一步整体隐藏（不是置灰）\n    $("step1").classList.toggle("hide", hasKey);\n\n    // 单一出口：现在该做什么，只有这里算\n    const next = $("next-action");\n    if (state.authed && hasKey) {\n      next.textContent = "已登录。要给另一台设备绑定，点「再添加一个 passkey」。";\n      next.className = "next done";\n    } else if (!state.authed && hasKey) {\n      next.textContent = "这台电脑已有 passkey —— 点「用这台电脑的 passkey 登录」，确认一次即可进入。";\n      next.className = "next act";\n    } else if (!state.authed && !hasKey) {\n      next.textContent = "首次使用（系统里还没有任何 passkey）：粘一次性令牌完成引导，之后令牌自动失效。";\n      next.className = "next act";\n    } else {\n      next.textContent = "令牌已通过：点「添加这台电脑的 passkey」，在系统窗口里确认一次。";\n      next.className = "next act";\n    }\n\n    const step1 = $("step1");\n    step1.classList.toggle("done", state.authed);\n    step1.classList.toggle("active", !state.authed);\n    $("token-row").classList.toggle("hide", state.authed);\n    $("step1-hint").textContent = state.authed\n      ? "令牌已验证 ✓"\n      : "令牌在项目根目录的 .dev.vars 文件里，也等于 Worker 上配置的那个同名 Secret。只用于这次绑定。";\n\n    const step2 = $("step2");\n    step2.classList.toggle("done", hasKey);\n    step2.classList.toggle("active", state.authed && !hasKey);\n    $("btn-register").disabled = false;\n    $("btn-register").textContent = hasKey ? "再添加一个 passkey" : "添加这台电脑的 passkey";\n    $("btn-register").classList.toggle("primary", state.authed || hasKey);\n    $("btn-login").classList.toggle("primary", !state.authed && hasKey);\n    $("btn-login").classList.toggle("hide", !hasKey || state.authed);\n    if (!state.authed) {\n      $("step2-hint").textContent = "先完成第 1 步（输入令牌）才能绑定。";\n    } else if (hasKey) {\n      $("step2-hint").textContent = "已绑定 " + state.passkeys.length + " 个（域名 " + state.rpId + "），可以再给另一台设备绑一个。";\n    } else {\n      $("step2-hint").textContent = "现在可以绑定了。点按钮后系统会弹 Windows Hello / 指纹窗口，确认一次即可。绑定域名：" + state.rpId + "。";\n    }\n\n    $("step3").classList.toggle("done", hasKey);\n    $("step3-hint").textContent = hasKey\n      ? "完成。以后打开这个页面点一下就能进；令牌步骤已从本页移除。"\n      : "绑好后，以后打开这个页面点一下就能进。";\n\n    $("manage").classList.toggle("hide", !state.authed);\n\n    const warnings = [];\n    if (state.authed && !hasKey) warnings.push("这台电脑还没绑定 passkey（第 2 步）：当前只是令牌的临时会话，30 分钟内有效，建议顺手绑一下。");\n    if (state.vault === false) warnings.push("Vault 未绑定：弹幕与图片的增删不会落库，检查 wrangler.toml 的 VAULT 绑定。");\n    if (state.uploads === false) warnings.push("UPLOADS 未绑定：图片无法保存，检查 KV 绑定。");\n    const bar = $("warnbar");\n    bar.classList.toggle("hide", warnings.length === 0);\n    bar.textContent = warnings.join(" ");\n\n    if (state.authed) await loadList();\n  }\n\n  function credToJSON(cred) {\n    const r = cred.response;\n    const out = { id: cred.id };\n    if (r.attestationObject) {\n      out.response = { clientDataJSON: b64u.enc(r.clientDataJSON), attestationObject: b64u.enc(r.attestationObject) };\n    } else {\n      out.response = {\n        clientDataJSON: b64u.enc(r.clientDataJSON),\n        authenticatorData: b64u.enc(r.authenticatorData),\n        signature: b64u.enc(r.signature),\n        userHandle: r.userHandle ? b64u.enc(r.userHandle) : null,\n      };\n    }\n    return out;\n  }\n\n  let busy = false;\n\n  async function register(auto) {\n    if (busy) return;\n    if (!state.authed) {\n      say("bind-status", "还没验证令牌：先把令牌粘进第 1 步的输入框，点「验证令牌」，我会自动接着走这一步。", "warn");\n      const input = $("token-input");\n      if (input) input.focus();\n      return;\n    }\n    if (!window.PublicKeyCredential) {\n      say("bind-status", "这个浏览器不支持 passkey（需要较新的 Chrome / Edge / Safari）。", "err");\n      return;\n    }\n    busy = true;\n    say("bind-status", auto ? "令牌已通过，正在弹出系统验证窗口…" : "正在请求系统验证…", "warn");\n    try {\n      const opts = await api("/passkey/options", { method: "POST", body: { mode: "register" } });\n      const pk = opts.publicKey;\n      pk.challenge = b64u.dec(pk.challenge);\n      pk.user.id = b64u.dec(pk.user.id);\n      const cred = await navigator.credentials.create({ publicKey: pk });\n      if (!cred) throw new Error("系统没有返回凭据");\n      await api("/passkey/register", {\n        method: "POST",\n        body: { response: credToJSON(cred).response, name: navigator.userAgent.slice(0, 40) },\n      });\n      say("bind-status", "绑定成功 ✓ 这台电脑以后可以直接登录", "ok");\n      await refresh();\n    } catch (err) {\n      say("bind-status", "绑定失败：" + explain(err), "err");\n    } finally {\n      busy = false;\n    }\n  }\n\n  async function login() {\n    say("bind-status", "正在请求系统验证…", "warn");\n    try {\n      const opts = await api("/passkey/options", { method: "POST", body: { mode: "login" } });\n      const pk = opts.publicKey;\n      pk.challenge = b64u.dec(pk.challenge);\n      pk.allowCredentials = (pk.allowCredentials || []).map((c) => ({ ...c, id: b64u.dec(c.id) }));\n      const cred = await navigator.credentials.get({ publicKey: pk });\n      if (!cred) throw new Error("系统没有返回凭据");\n      await api("/passkey/login", { method: "POST", body: { id: cred.id, response: credToJSON(cred).response } });\n      say("bind-status", "登录成功 ✓", "ok");\n      await refresh();\n    } catch (err) {\n      say("bind-status", "登录失败：" + explain(err), "err");\n    }\n  }\n\n  async function tokenLogin() {\n    const token = $("token-input").value.trim();\n    if (!token) return say("bind-status", "请先填入令牌", "warn");\n    say("bind-status", "正在验证令牌…", "warn");\n    try {\n      await api("/token", { method: "POST", body: { token } });\n      $("token-input").value = "";\n      say("bind-status", "令牌通过 ✓ 正在接着弹出系统验证窗口…", "ok");\n      await refresh();\n      // 用户刚点过按钮，仍处于用户激活期内，直接进入注册可以省掉第二次点击\n      await register(true);\n    } catch (err) {\n      say("bind-status", "令牌验证失败：" + explain(err), "err");\n    }\n  }\n\n  async function loadList() {\n    try {\n      const data = await api("/list");\n      cache = { danmaku: data.danmaku || [], uploads: data.uploads || [] };\n      render();\n    } catch (err) {\n      say("panel-status", "读取失败：" + explain(err), "err");\n    }\n  }\n\n  function when(ts) {\n    return ts ? new Date(ts).toLocaleString("zh-CN", { hour12: false }) : "—";\n  }\n\n  function render() {\n    const list = $("list");\n    list.innerHTML = "";\n    let items = [];\n\n    if (tab === "danmaku") {\n      items = cache.danmaku.map((d) => ({ kind: "danmaku", id: d.id, title: d.text, meta: d.color + " · " + d.size + "px · " + when(d.created) }));\n    } else if (tab === "uploads") {\n      items = cache.uploads.map((u) => ({ kind: "upload", id: u.id, title: u.title || u.id, meta: u.mime + " · " + (u.bytes / 1024).toFixed(1) + " KB · " + when(u.created), thumb: "/img/" + u.id }));\n    } else {\n      items = state.passkeys.map((k) => ({ kind: "passkey", id: k.id, title: k.name || k.id.slice(0, 12), meta: "注册于 " + when(k.created) }));\n    }\n\n    $("empty").classList.toggle("hide", items.length > 0);\n\n    for (const item of items) {\n      const li = document.createElement("li");\n      if (item.thumb) {\n        const img = document.createElement("img");\n        img.className = "thumb";\n        img.src = item.thumb;\n        img.alt = "";\n        img.loading = "lazy";\n        li.appendChild(img);\n      }\n      const meta = document.createElement("div");\n      meta.className = "meta";\n      const b = document.createElement("b");\n      b.textContent = item.title;\n      const sp = document.createElement("span");\n      sp.textContent = item.meta;\n      meta.append(b, sp);\n      li.appendChild(meta);\n\n      const del = document.createElement("button");\n      del.type = "button";\n      del.className = "danger";\n      del.textContent = "删除";\n      del.addEventListener("click", async () => {\n        del.disabled = true;\n        try {\n          if (item.kind === "passkey") await api("/passkey/remove", { method: "POST", body: { id: item.id } });\n          else await api("/delete", { method: "POST", body: { kind: item.kind, id: item.id } });\n          say("panel-status", "已删除", "ok");\n          await refresh();\n        } catch (err) {\n          say("panel-status", "删除失败：" + explain(err), "err");\n          del.disabled = false;\n        }\n      });\n      li.appendChild(del);\n      list.appendChild(li);\n    }\n  }\n\n  $("btn-token").addEventListener("click", tokenLogin);\n  $("token-input").addEventListener("keydown", (e) => { if (e.key === "Enter") tokenLogin(); });\n  $("btn-register").addEventListener("click", () => register(false));\n  $("btn-login").addEventListener("click", login);\n  $("btn-logout").addEventListener("click", async () => {\n    await api("/logout", { method: "POST" }).catch(() => {});\n    await refresh();\n  });\n\n  for (const btn of document.querySelectorAll("[data-tab]")) {\n    btn.addEventListener("click", () => {\n      tab = btn.dataset.tab;\n      for (const other of document.querySelectorAll("[data-tab]")) {\n        other.setAttribute("aria-selected", String(other === btn));\n      }\n      render();\n    });\n  }\n\n  refresh();\n<\/script>\n</body>\n</html>\n';
+var admin_default = '<!DOCTYPE html>\n<html lang="zh-CN">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n<meta name="color-scheme" content="dark">\n<meta name="robots" content="noindex, nofollow">\n<title>管理台 · 奶蛙中学</title>\n<link rel="icon" href="/favicon.ico" sizes="any">\n<style nonce="{{NONCE}}">\n  :root {\n    --bg: #050506; --fg: #f5f5f7; --ink: #8a8a8f; --soft: #63636a;\n    --hair: rgba(255,255,255,.09); --hair2: rgba(255,255,255,.18);\n    --ok: #3fa86a; --warn: #d8bb62; --err: #d98b86;\n    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;\n  }\n  *, *::before, *::after { box-sizing: border-box; }\n  body {\n    margin: 0; background: var(--bg); color: var(--fg); min-height: 100vh;\n    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Microsoft YaHei", sans-serif;\n    font-size: 14px; line-height: 1.65; -webkit-font-smoothing: antialiased;\n  }\n  .wrap { width: min(880px, 100%); margin: 0 auto; padding: 44px 24px 90px; }\n  .seam { height: 1px; background: linear-gradient(90deg, transparent, var(--hair2) 20%, var(--hair2) 80%, transparent); margin: 0 0 26px; }\n  .kicker { font-family: var(--mono); font-size: 10px; letter-spacing: .22em; text-transform: uppercase; color: var(--soft); margin: 0 0 18px; }\n  h1 { font-size: 26px; font-weight: 500; letter-spacing: -.02em; margin: 0 0 6px; }\n  .sub { color: var(--ink); margin: 0 0 26px; font-size: 13px; }\n  .card { border: 1px solid var(--hair); border-radius: 12px; padding: 20px; margin-bottom: 16px; }\n  .card h2 { font-size: 14px; font-weight: 500; margin: 0 0 14px; }\n\n  /* 三步向导 */\n  .steps { list-style: none; margin: 0; padding: 0; counter-reset: step; }\n  .steps li { position: relative; padding: 14px 0 14px 42px; border-bottom: 1px solid var(--hair); }\n  .steps li:last-child { border-bottom: 0; padding-bottom: 0; }\n  .steps li::before {\n    counter-increment: step; content: counter(step);\n    position: absolute; left: 0; top: 14px; width: 26px; height: 26px; border-radius: 50%;\n    display: flex; align-items: center; justify-content: center;\n    font-family: var(--mono); font-size: 11px; color: var(--soft);\n    border: 1px solid var(--hair2);\n  }\n  .steps li.done::before { content: "✓"; color: var(--ok); border-color: rgba(63,168,106,.5); }\n  .steps li.active::before { color: var(--fg); border-color: var(--fg); }\n  .steps b { display: block; font-weight: 500; font-size: 13.5px; margin-bottom: 8px; }\n  .steps .hint { color: var(--soft); font-size: 12px; margin: 6px 0 0; }\n  .next {\n    margin: 0 0 16px; padding: 11px 14px; border-radius: 10px;\n    background: rgba(255,255,255,.04); border: 1px solid var(--hair);\n    font-size: 12.5px; color: var(--fg); letter-spacing: .01em;\n  }\n  .next.done { border-color: rgba(63,168,106,.35); color: var(--ok); }\n  .next.act { border-color: var(--hair2); }\n  .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }\n  button {\n    font: inherit; font-size: 13px; padding: 9px 18px; border-radius: 980px; cursor: pointer;\n    border: 1px solid var(--hair2); background: transparent; color: var(--fg);\n    transition: background-color .2s ease, border-color .2s ease, opacity .2s ease;\n  }\n  button:hover:not(:disabled) { background: rgba(255,255,255,.06); }\n  button.primary { background: var(--fg); color: #0a0a0c; border-color: var(--fg); }\n  button.primary:hover:not(:disabled) { background: #fff; }\n  button.danger { border-color: rgba(217,139,134,.45); color: var(--err); }\n  button.danger:hover:not(:disabled) { background: rgba(217,139,134,.1); }\n  button:disabled { opacity: .4; cursor: not-allowed; }\n  input[type="text"], input[type="password"] {\n    font: inherit; font-size: 13px; padding: 9px 14px; border-radius: 9px; min-width: 250px;\n    border: 1px solid var(--hair2); background: rgba(255,255,255,.03); color: var(--fg);\n  }\n  input:focus { outline: 2px solid var(--hair2); outline-offset: 1px; }\n  .status { font-family: var(--mono); font-size: 11.5px; letter-spacing: .04em; margin: 14px 0 0; min-height: 18px; }\n  .status.ok { color: var(--ok); } .status.warn { color: var(--warn); } .status.err { color: var(--err); }\n  .warnbar {\n    border: 1px solid rgba(216,187,98,.35); background: rgba(216,187,98,.06); color: var(--warn);\n    border-radius: 10px; padding: 12px 14px; font-size: 12.5px; margin-bottom: 16px;\n  }\n  .tabs { display: flex; gap: 8px; margin: 0 0 14px; flex-wrap: wrap; align-items: center; }\n  .tabs button { padding: 7px 16px; font-size: 12.5px; }\n  .tabs button[aria-selected="true"] { background: rgba(255,255,255,.09); border-color: var(--hair2); }\n  .list { list-style: none; margin: 0; padding: 0; }\n  .list li { display: flex; gap: 14px; align-items: flex-start; padding: 12px 0; border-bottom: 1px solid var(--hair); }\n  .list li:last-child { border-bottom: 0; }\n  .meta { flex: 1; min-width: 0; }\n  .meta b { font-weight: 500; word-break: break-word; }\n  .meta span { display: block; font-family: var(--mono); font-size: 10.5px; color: var(--soft); letter-spacing: .04em; margin-top: 3px; }\n  .thumb { width: 64px; height: 64px; border-radius: 8px; object-fit: cover; border: 1px solid var(--hair); flex: none; }\n  .empty { color: var(--soft); font-size: 12.5px; padding: 10px 0; }\n  .hide { display: none !important; }\n  .domain { font-family: var(--mono); font-size: 11.5px; color: var(--fg); }\n</style>\n</head>\n<body>\n<div class="wrap">\n  <div class="seam"></div>\n  <p class="kicker">Admin &middot; 奶蛙中学</p>\n  <h1>管理台</h1>\n  <p class="sub">按顺序做完两步，这台电脑就能用 passkey 一键进管理台。</p>\n\n  <div id="warnbar" class="warnbar hide"></div>\n\n  <section class="card" id="bind-card">\n    <h2>绑定这台电脑</h2>\n    <p class="next" id="next-action">正在读取状态…</p>\n    <ol class="steps">\n      <li id="step1" class="active">\n        <b>第 1 步 · 输入一次管理令牌</b>\n        <div class="row" id="token-row">\n          <input type="password" id="token-input" placeholder="管理令牌" autocomplete="off">\n          <button class="primary" id="btn-token" type="button">验证令牌</button>\n        </div>\n        <p class="hint" id="step1-hint">令牌在项目根目录的 .dev.vars 文件里，也等于 Worker 上配置的那个同名 Secret。只用于这次绑定。</p>\n      </li>\n      <li id="step2">\n        <b>第 2 步 · 添加这台电脑的 passkey</b>\n        <div class="row">\n          <button class="primary" id="btn-register" type="button">添加这台电脑的 passkey</button>\n          <button id="btn-login" type="button" class="hide">用已有的 passkey 登录</button>\n        </div>\n        <p class="hint" id="step2-hint">先完成第 1 步（输入令牌）才能绑定。</p>\n      </li>\n      <li id="step3">\n        <b>第 3 步 · 完成</b>\n        <p class="hint" id="step3-hint">绑好后，以后打开这个页面点一下就能进。</p>\n      </li>\n    </ol>\n    <p class="status" id="bind-status"></p>\n  </section>\n\n  <section id="manage" class="hide">\n    <div class="tabs" role="tablist">\n      <button role="tab" aria-selected="true" data-tab="danmaku">弹幕</button>\n      <button role="tab" aria-selected="false" data-tab="uploads">图片</button>\n      <button role="tab" aria-selected="false" data-tab="keys">密钥</button>\n      <button role="tab" aria-selected="false" data-tab="blocks">黑名单</button>\n      <button id="btn-logout" type="button" style="margin-left:auto">退出</button>\n    </div>\n    <div class="card">\n      <ul class="list" id="list"></ul>\n      <p class="empty hide" id="empty">这里还是空的。</p>\n      <p class="status" id="panel-status"></p>\n    </div>\n  </section>\n</div>\n\n<script nonce="{{NONCE}}">\n  "use strict";\n\n  const $ = (id) => document.getElementById(id);\n  const b64u = {\n    enc(buf) {\n      const b = new Uint8Array(buf);\n      let s = "";\n      for (let i = 0; i < b.length; i += 1) s += String.fromCharCode(b[i]);\n      return btoa(s).replace(/\\+/g, "-").replace(/\\//g, "_").replace(/=+$/, "");\n    },\n    dec(str) {\n      const s = String(str).replace(/-/g, "+").replace(/_/g, "/");\n      const bin = atob(s + (s.length % 4 ? "=".repeat(4 - (s.length % 4)) : ""));\n      const out = new Uint8Array(bin.length);\n      for (let i = 0; i < bin.length; i += 1) out[i] = bin.charCodeAt(i);\n      return out;\n    },\n  };\n\n  let state = { authed: false, passkeys: [], rpId: "", vault: false, uploads: false };\n  let tab = "danmaku";\n  let cache = { danmaku: [], uploads: [], blocks: [] };\n\n  function say(id, text, kind) {\n    const el = $(id);\n    el.textContent = text || "";\n    el.className = "status" + (kind ? " " + kind : "");\n  }\n\n  function explain(err) {\n    const name = (err && err.name) || "";\n    if (name === "NotAllowedError") {\n      return "系统窗口被取消或超时了。再点一次；如果一直不弹出，先确认这台电脑设置过 Windows Hello（PIN / 指纹 / 人脸）。";\n    }\n    if (name === "SecurityError") {\n      return "域名不匹配：passkey 只能绑定当前域名（" + state.rpId + "）。别用 IP 或 *.workers.dev 地址访问。";\n    }\n    if (name === "InvalidStateError") {\n      return "这台设备已经注册过 passkey 了，直接点「用已有的 passkey 登录」。";\n    }\n    if (name === "NotSupportedError" || name === "ConstraintError") {\n      return "当前浏览器或系统不支持 passkey（需要 Windows Hello、Touch ID 或安全密钥）。";\n    }\n    if (name === "AbortError") return "操作被中断，重试一次。";\n    return (err && err.message) || String(err);\n  }\n\n  async function api(path, options) {\n    const res = await fetch("/admin/api" + path, {\n      method: (options && options.method) || "GET",\n      headers: { "content-type": "application/json" },\n      credentials: "same-origin",\n      body: options && options.body ? JSON.stringify(options.body) : undefined,\n    });\n    const data = await res.json().catch(() => ({}));\n    if (!res.ok) throw new Error(data.error || "HTTP " + res.status);\n    return data;\n  }\n\n  async function refresh() {\n    try {\n      state = await api("/session");\n    } catch (err) {\n      say("bind-status", "读取状态失败：" + explain(err), "err");\n      return;\n    }\n\n    const hasKey = state.passkeys.length > 0;\n    const label = $("domain-label");\n    if (label) label.textContent = state.rpId || location.hostname;\n\n    $("bind-card").classList.toggle("hide", state.authed && hasKey);\n\n    // 有 passkey 之后，令牌这一步整体隐藏（不是置灰）\n    $("step1").classList.toggle("hide", hasKey);\n\n    // 单一出口：现在该做什么，只有这里算\n    const next = $("next-action");\n    if (state.authed && hasKey) {\n      next.textContent = "已登录。要给另一台设备绑定，点「再添加一个 passkey」。";\n      next.className = "next done";\n    } else if (!state.authed && hasKey) {\n      next.textContent = "这台电脑已有 passkey —— 点「用这台电脑的 passkey 登录」，确认一次即可进入。";\n      next.className = "next act";\n    } else if (!state.authed && !hasKey) {\n      next.textContent = "首次使用（系统里还没有任何 passkey）：粘一次性令牌完成引导，之后令牌自动失效。";\n      next.className = "next act";\n    } else {\n      next.textContent = "令牌已通过：点「添加这台电脑的 passkey」，在系统窗口里确认一次。";\n      next.className = "next act";\n    }\n\n    const step1 = $("step1");\n    step1.classList.toggle("done", state.authed);\n    step1.classList.toggle("active", !state.authed);\n    $("token-row").classList.toggle("hide", state.authed);\n    $("step1-hint").textContent = state.authed\n      ? "令牌已验证 ✓"\n      : "令牌在项目根目录的 .dev.vars 文件里，也等于 Worker 上配置的那个同名 Secret。只用于这次绑定。";\n\n    const step2 = $("step2");\n    step2.classList.toggle("done", hasKey);\n    step2.classList.toggle("active", state.authed && !hasKey);\n    $("btn-register").disabled = false;\n    $("btn-register").textContent = hasKey ? "再添加一个 passkey" : "添加这台电脑的 passkey";\n    $("btn-register").classList.toggle("primary", state.authed || hasKey);\n    $("btn-login").classList.toggle("primary", !state.authed && hasKey);\n    $("btn-login").classList.toggle("hide", !hasKey || state.authed);\n    if (!state.authed) {\n      $("step2-hint").textContent = "先完成第 1 步（输入令牌）才能绑定。";\n    } else if (hasKey) {\n      $("step2-hint").textContent = "已绑定 " + state.passkeys.length + " 个（域名 " + state.rpId + "），可以再给另一台设备绑一个。";\n    } else {\n      $("step2-hint").textContent = "现在可以绑定了。点按钮后系统会弹 Windows Hello / 指纹窗口，确认一次即可。绑定域名：" + state.rpId + "。";\n    }\n\n    $("step3").classList.toggle("done", hasKey);\n    $("step3-hint").textContent = hasKey\n      ? "完成。以后打开这个页面点一下就能进；令牌步骤已从本页移除。"\n      : "绑好后，以后打开这个页面点一下就能进。";\n\n    $("manage").classList.toggle("hide", !state.authed);\n\n    const warnings = [];\n    if (state.authed && !hasKey) warnings.push("这台电脑还没绑定 passkey（第 2 步）：当前只是令牌的临时会话，30 分钟内有效，建议顺手绑一下。");\n    if (state.vault === false) warnings.push("Vault 未绑定：弹幕与图片的增删不会落库，检查 wrangler.toml 的 VAULT 绑定。");\n    if (state.uploads === false) warnings.push("UPLOADS 未绑定：图片无法保存，检查 KV 绑定。");\n    const bar = $("warnbar");\n    bar.classList.toggle("hide", warnings.length === 0);\n    bar.textContent = warnings.join(" ");\n\n    if (state.authed) await loadList();\n  }\n\n  function credToJSON(cred) {\n    const r = cred.response;\n    const out = { id: cred.id };\n    if (r.attestationObject) {\n      out.response = { clientDataJSON: b64u.enc(r.clientDataJSON), attestationObject: b64u.enc(r.attestationObject) };\n    } else {\n      out.response = {\n        clientDataJSON: b64u.enc(r.clientDataJSON),\n        authenticatorData: b64u.enc(r.authenticatorData),\n        signature: b64u.enc(r.signature),\n        userHandle: r.userHandle ? b64u.enc(r.userHandle) : null,\n      };\n    }\n    return out;\n  }\n\n  let busy = false;\n\n  async function register(auto) {\n    if (busy) return;\n    if (!state.authed) {\n      say("bind-status", "还没验证令牌：先把令牌粘进第 1 步的输入框，点「验证令牌」，我会自动接着走这一步。", "warn");\n      const input = $("token-input");\n      if (input) input.focus();\n      return;\n    }\n    if (!window.PublicKeyCredential) {\n      say("bind-status", "这个浏览器不支持 passkey（需要较新的 Chrome / Edge / Safari）。", "err");\n      return;\n    }\n    busy = true;\n    say("bind-status", auto ? "令牌已通过，正在弹出系统验证窗口…" : "正在请求系统验证…", "warn");\n    try {\n      const opts = await api("/passkey/options", { method: "POST", body: { mode: "register" } });\n      const pk = opts.publicKey;\n      pk.challenge = b64u.dec(pk.challenge);\n      pk.user.id = b64u.dec(pk.user.id);\n      const cred = await navigator.credentials.create({ publicKey: pk });\n      if (!cred) throw new Error("系统没有返回凭据");\n      await api("/passkey/register", {\n        method: "POST",\n        body: { response: credToJSON(cred).response, name: navigator.userAgent.slice(0, 40) },\n      });\n      say("bind-status", "绑定成功 ✓ 这台电脑以后可以直接登录", "ok");\n      await refresh();\n    } catch (err) {\n      say("bind-status", "绑定失败：" + explain(err), "err");\n    } finally {\n      busy = false;\n    }\n  }\n\n  async function login() {\n    say("bind-status", "正在请求系统验证…", "warn");\n    try {\n      const opts = await api("/passkey/options", { method: "POST", body: { mode: "login" } });\n      const pk = opts.publicKey;\n      pk.challenge = b64u.dec(pk.challenge);\n      pk.allowCredentials = (pk.allowCredentials || []).map((c) => ({ ...c, id: b64u.dec(c.id) }));\n      const cred = await navigator.credentials.get({ publicKey: pk });\n      if (!cred) throw new Error("系统没有返回凭据");\n      await api("/passkey/login", { method: "POST", body: { id: cred.id, response: credToJSON(cred).response } });\n      say("bind-status", "登录成功 ✓", "ok");\n      await refresh();\n    } catch (err) {\n      say("bind-status", "登录失败：" + explain(err), "err");\n    }\n  }\n\n  async function tokenLogin() {\n    const token = $("token-input").value.trim();\n    if (!token) return say("bind-status", "请先填入令牌", "warn");\n    say("bind-status", "正在验证令牌…", "warn");\n    try {\n      await api("/token", { method: "POST", body: { token } });\n      $("token-input").value = "";\n      say("bind-status", "令牌通过 ✓ 正在接着弹出系统验证窗口…", "ok");\n      await refresh();\n      // 用户刚点过按钮，仍处于用户激活期内，直接进入注册可以省掉第二次点击\n      await register(true);\n    } catch (err) {\n      say("bind-status", "令牌验证失败：" + explain(err), "err");\n    }\n  }\n\n  async function loadList() {\n    try {\n      const [data, blocked] = await Promise.all([api("/list"), api("/blocks").catch(() => ({ items: [] }))]);\n      cache = {\n        danmaku: data.danmaku || [],\n        uploads: data.uploads || [],\n        blocks: blocked.items || [],\n      };\n      render();\n    } catch (err) {\n      say("panel-status", "读取失败：" + explain(err), "err");\n    }\n  }\n\n  function when(ts) {\n    return ts ? new Date(ts).toLocaleString("zh-CN", { hour12: false }) : "—";\n  }\n\n  function render() {\n    const list = $("list");\n    list.innerHTML = "";\n    let items = [];\n\n    if (tab === "danmaku") {\n      items = cache.danmaku.map((d) => ({\n        kind: "danmaku",\n        id: d.id,\n        title: d.text,\n        meta: d.color + " · " + d.size + "px · " + when(d.created) + " · IP " + (d.ip || "—") +\n          (d.bfp ? " · 指纹 " + d.bfp + "/" + (d.dfp || "—") : ""),\n        ip: d.ip || "",\n      }));\n    } else if (tab === "uploads") {\n      items = cache.uploads.map((u) => ({\n        kind: "upload",\n        id: u.id,\n        title: u.title || u.id,\n        meta: u.mime + " · " + (u.bytes / 1024).toFixed(1) + " KB · " + when(u.created) +\n          " · IP " + (u.ip || "—") +\n          (u.bfp ? " · 指纹 " + u.bfp + "/" + (u.dfp || "—") : ""),\n        thumb: "/img/" + u.id,\n        ip: u.ip || "",\n      }));\n    } else if (tab === "blocks") {\n      items = cache.blocks.map((b) => ({\n        kind: "block",\n        id: b.ip,\n        title: b.ip,\n        meta: "加入于 " + when(b.created) + (b.reason ? " · " + b.reason : "") + " · 该 IP 无法上传图片",\n      }));\n    } else {\n      items = state.passkeys.map((k) => ({ kind: "passkey", id: k.id, title: k.name || k.id.slice(0, 12), meta: "注册于 " + when(k.created) }));\n    }\n\n    $("empty").classList.toggle("hide", items.length > 0);\n\n    for (const item of items) {\n      const li = document.createElement("li");\n      if (item.thumb) {\n        const img = document.createElement("img");\n        img.className = "thumb";\n        img.src = item.thumb;\n        img.alt = "";\n        img.loading = "lazy";\n        li.appendChild(img);\n      }\n      const meta = document.createElement("div");\n      meta.className = "meta";\n      const b = document.createElement("b");\n      b.textContent = item.title;\n      const sp = document.createElement("span");\n      sp.textContent = item.meta;\n      meta.append(b, sp);\n      li.appendChild(meta);\n\n      const actions = [];\n\n      if (item.kind === "upload" && item.ip) {\n        actions.push({\n          label: "拉黑",\n          className: "",\n          onClick: async () => {\n            const ok = window.confirm("确认拉黑该 IP？\\n\\n" + item.ip + "\\n\\n拉黑后该 IP 无法上传图片（弹幕不受影响），可在「黑名单」里解除。");\n            if (!ok) return;\n            await api("/block", { method: "POST", body: { ip: item.ip, reason: "手动拉黑" } });\n            say("panel-status", "已拉黑 " + item.ip, "ok");\n            await refresh();\n          },\n        });\n      }\n\n      if (item.kind === "block") {\n        actions.push({\n          label: "解除",\n          className: "",\n          onClick: async () => {\n            const ok = window.confirm("确认解除对该 IP 的上传限制？\\n\\n" + item.ip);\n            if (!ok) return;\n            await api("/unblock", { method: "POST", body: { ip: item.ip } });\n            say("panel-status", "已解除 " + item.ip, "ok");\n            await refresh();\n          },\n        });\n      }\n\n      for (const act of actions) {\n        const btn = document.createElement("button");\n        btn.type = "button";\n        btn.textContent = act.label;\n        if (act.className) btn.className = act.className;\n        btn.addEventListener("click", async () => {\n          btn.disabled = true;\n          try {\n            await act.onClick();\n          } catch (err) {\n            say("panel-status", act.label + "失败：" + explain(err), "err");\n            btn.disabled = false;\n          }\n        });\n        li.appendChild(btn);\n      }\n\n      const del = document.createElement("button");\n      del.type = "button";\n      del.className = "danger";\n      del.textContent = "删除";\n      del.addEventListener("click", async () => {\n        del.disabled = true;\n        try {\n          if (item.kind === "passkey") await api("/passkey/remove", { method: "POST", body: { id: item.id } });\n          else await api("/delete", { method: "POST", body: { kind: item.kind, id: item.id } });\n          say("panel-status", "已删除", "ok");\n          await refresh();\n        } catch (err) {\n          say("panel-status", "删除失败：" + explain(err), "err");\n          del.disabled = false;\n        }\n      });\n      if (item.kind !== "block") li.appendChild(del);\n      list.appendChild(li);\n    }\n  }\n\n  $("btn-token").addEventListener("click", tokenLogin);\n  $("token-input").addEventListener("keydown", (e) => { if (e.key === "Enter") tokenLogin(); });\n  $("btn-register").addEventListener("click", () => register(false));\n  $("btn-login").addEventListener("click", login);\n  $("btn-logout").addEventListener("click", async () => {\n    await api("/logout", { method: "POST" }).catch(() => {});\n    await refresh();\n  });\n\n  for (const btn of document.querySelectorAll("[data-tab]")) {\n    btn.addEventListener("click", () => {\n      tab = btn.dataset.tab;\n      for (const other of document.querySelectorAll("[data-tab]")) {\n        other.setAttribute("aria-selected", String(other === btn));\n      }\n      render();\n    });\n  }\n\n  refresh();\n<\/script>\n</body>\n</html>\n';
 
 // src/webauthn.js
 var TE = new TextEncoder();
@@ -1369,11 +1495,15 @@ async function handleDanmakuPost(request, env, url, cfg) {
   if (!body) return json({ error: "格式错误" }, 400);
   const ip = request.headers.get("cf-connecting-ip") || "0.0.0.0";
   const iphash = await sha256Hex(`${ip}|${cfg.apiSecret || ""}`);
+  const fp = fingerprintsOf(request);
   const res = await vaultPost(env, "/danmaku", {
     text: body.text,
     color: body.color,
     size: body.size,
-    iphash
+    iphash,
+    ip,
+    bfp: fp.bfp,
+    dfp: fp.dfp
   });
   if (!res) return json({ error: "写入失败" }, 500);
   if (res.error) return json({ error: res.error }, res.error.includes("太快") ? 429 : 400);
@@ -1405,10 +1535,21 @@ async function handleUploadPost(request, env, url, cfg) {
   });
   const ip = request.headers.get("cf-connecting-ip") || "0.0.0.0";
   const iphash = await sha256Hex(`${ip}|${cfg.apiSecret || ""}`);
-  const rec = await vaultPost(env, "/upload", { id, mime: kind.mime, bytes: buf.length, iphash, title });
-  if (!rec || rec.error) {
+  const fp = fingerprintsOf(request);
+  const rec = await vaultRaw(env, "/upload", {
+    id,
+    mime: kind.mime,
+    bytes: buf.length,
+    iphash,
+    title,
+    ip,
+    bfp: fp.bfp,
+    dfp: fp.dfp
+  });
+  if (rec.status !== 200 || !rec.data || rec.data.error) {
     await env.UPLOADS.delete(`img:${id}`);
-    return json({ error: rec && rec.error || "记录失败" }, 429);
+    const code = rec.status === 403 ? 403 : rec.status === 429 ? 429 : 500;
+    return json({ error: rec.data && rec.data.error || "记录失败", blocked: code === 403 }, code);
   }
   return json({ ok: true, item: { id, mime: kind.mime, bytes: buf.length, title } }, 201);
 }
@@ -1606,12 +1747,47 @@ async function handleAdminApi(request, env, url, cfg) {
     }
     return json({ error: "kind 非法" }, 400);
   }
+  if (path === "/blocks" && request.method === "GET") {
+    const list = await vaultCall(env, "/blocks") || { items: [] };
+    return json({ items: list.items || [] });
+  }
+  if (path === "/block" && request.method === "POST") {
+    const body = await request.json().catch(() => ({}));
+    const ip = String(body.ip || "").slice(0, 45);
+    if (!ip) return json({ error: "缺少 IP" }, 400);
+    await vaultPost(env, "/block", { ip, reason: String(body.reason || "").slice(0, 80) });
+    return json({ ok: true, ip });
+  }
+  if (path === "/unblock" && request.method === "POST") {
+    const body = await request.json().catch(() => ({}));
+    const ip = String(body.ip || "").slice(0, 45);
+    if (!ip) return json({ error: "缺少 IP" }, 400);
+    await vaultPost(env, "/unblock", { ip });
+    return json({ ok: true, ip });
+  }
   if (path === "/passkey/remove" && request.method === "POST") {
     const body = await request.json().catch(() => ({}));
     await vaultPost(env, "/passkey/remove", { id: String(body.id || "") });
     return json({ ok: true });
   }
   return notFound();
+}
+async function vaultRaw(env, path, body) {
+  const stub = vault(env);
+  if (!stub) return { status: 503, data: { error: "Vault 未就绪" } };
+  const res = await stub.fetch("https://vault.internal" + path, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body)
+  });
+  return { status: res.status, data: await res.json().catch(() => ({})) };
+}
+function fingerprintsOf(request) {
+  const ok = (v) => /^[a-f0-9]{8,32}$/i.test(v || "") ? v.toLowerCase() : "";
+  return {
+    bfp: ok(request.headers.get("x-bfp") || ""),
+    dfp: ok(request.headers.get("x-dfp") || "")
+  };
 }
 
 // assets/naiwa.jpg
@@ -1987,19 +2163,37 @@ var DDL = [
   `CREATE TABLE IF NOT EXISTS passkeys (
      id TEXT PRIMARY KEY, jwk TEXT NOT NULL, alg INTEGER NOT NULL,
      signcount INTEGER NOT NULL DEFAULT 0, created INTEGER NOT NULL, name TEXT NOT NULL DEFAULT ''
+   )`,
+  `CREATE TABLE IF NOT EXISTS blocks (
+     ip TEXT PRIMARY KEY, created INTEGER NOT NULL, reason TEXT NOT NULL DEFAULT ''
    )`
+];
+var MIGRATIONS = [
+  "ALTER TABLE uploads ADD COLUMN ip TEXT NOT NULL DEFAULT ''",
+  "ALTER TABLE uploads ADD COLUMN bfp TEXT NOT NULL DEFAULT ''",
+  "ALTER TABLE uploads ADD COLUMN dfp TEXT NOT NULL DEFAULT ''",
+  "ALTER TABLE danmaku ADD COLUMN ip TEXT NOT NULL DEFAULT ''",
+  "ALTER TABLE danmaku ADD COLUMN bfp TEXT NOT NULL DEFAULT ''",
+  "ALTER TABLE danmaku ADD COLUMN dfp TEXT NOT NULL DEFAULT ''"
 ];
 var MAX_DANMAKU = 400;
 var json3 = (body, status = 200) => new Response(JSON.stringify(body), {
   status,
   headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" }
 });
+var clean = (value, max) => String(value == null ? "" : value).slice(0, max);
 var Vault = class {
   constructor(state) {
     this.state = state;
     this.sql = state.storage.sql;
     this.ready = state.blockConcurrencyWhile(async () => {
       for (const ddl of DDL) this.sql.exec(ddl);
+      for (const sql of MIGRATIONS) {
+        try {
+          this.sql.exec(sql);
+        } catch {
+        }
+      }
     });
   }
   async fetch(request) {
@@ -2013,28 +2207,49 @@ var Vault = class {
           case "/danmaku":
             return this.addDanmaku(body);
           case "/danmaku/remove":
-            return this.removeDanmaku(body);
+            this.sql.exec("DELETE FROM danmaku WHERE id = ?", String(body.id || ""));
+            return json3({ ok: true });
           case "/upload":
             return this.addUpload(body);
           case "/uploads/remove":
-            return this.removeUpload(body);
+            this.sql.exec("DELETE FROM uploads WHERE id = ?", String(body.id || ""));
+            return json3({ ok: true });
+          case "/block":
+            return this.addBlock(body);
+          case "/unblock":
+            this.sql.exec("DELETE FROM blocks WHERE ip = ?", String(body.ip || ""));
+            return json3({ ok: true });
           case "/passkey":
             return this.addPasskey(body);
           case "/passkey/counter":
             this.sql.exec("UPDATE passkeys SET signcount = ? WHERE id = ?", Number(body.signCount) || 0, String(body.id));
             return json3({ ok: true });
           case "/passkey/remove":
-            this.sql.exec("DELETE FROM passkeys WHERE id = ?", String(body.id));
+            this.sql.exec("DELETE FROM passkeys WHERE id = ?", String(body.id || ""));
             return json3({ ok: true });
           default:
             return json3({ error: "unknown" }, 404);
         }
       }
       switch (path) {
-        case "/danmaku":
-          return this.listDanmaku(url);
-        case "/uploads":
-          return this.listUploads(url);
+        case "/danmaku": {
+          const limit = Math.min(200, Math.max(1, Number(url.searchParams.get("limit")) || 60));
+          const all = url.searchParams.get("all") === "1";
+          const where = all ? "" : "WHERE hidden = 0";
+          const cols = all ? "id, text, color, size, created, ip, bfp, dfp" : "id, text, color, size, created";
+          const items = this.sql.exec(`SELECT ${cols} FROM danmaku ${where} ORDER BY created DESC LIMIT ?`, limit).toArray();
+          return json3({ items: items.reverse() });
+        }
+        case "/uploads": {
+          const limit = Math.min(200, Math.max(1, Number(url.searchParams.get("limit")) || 60));
+          const all = url.searchParams.get("all") === "1";
+          const where = all ? "" : "WHERE hidden = 0";
+          const cols = all ? "id, mime, bytes, created, title, ip, bfp, dfp" : "id, mime, bytes, created, title";
+          const items = this.sql.exec(`SELECT ${cols} FROM uploads ${where} ORDER BY created DESC LIMIT ?`, limit).toArray();
+          return json3({ items });
+        }
+        case "/blocks":
+          return json3({ items: this.sql.exec("SELECT ip, created, reason FROM blocks ORDER BY created DESC").toArray() });
         case "/passkeys":
           return json3({ items: this.sql.exec("SELECT id, name, created FROM passkeys ORDER BY created ASC").toArray() });
         case "/passkey": {
@@ -2045,7 +2260,8 @@ var Vault = class {
           return json3({
             danmaku: this.sql.exec("SELECT COUNT(*) AS n FROM danmaku").one().n,
             uploads: this.sql.exec("SELECT COUNT(*) AS n FROM uploads").one().n,
-            passkeys: this.sql.exec("SELECT COUNT(*) AS n FROM passkeys").one().n
+            passkeys: this.sql.exec("SELECT COUNT(*) AS n FROM passkeys").one().n,
+            blocks: this.sql.exec("SELECT COUNT(*) AS n FROM blocks").one().n
           });
         default:
           return json3({ error: "unknown" }, 404);
@@ -2056,23 +2272,27 @@ var Vault = class {
   }
   /* ------------------------------------------------------------ 弹幕 */
   addDanmaku(body) {
-    const text2 = String(body.text || "").trim().slice(0, 60);
+    const text2 = clean(body.text, 60).trim();
     const color = /^#[0-9a-f]{6}$/i.test(String(body.color || "")) ? String(body.color).toLowerCase() : "#f5f5f7";
     const size = Math.min(28, Math.max(12, Number(body.size) || 15));
-    const iphash = String(body.iphash || "").slice(0, 64);
+    const iphash = clean(body.iphash, 64);
     const now = Date.now();
     if (!text2) return json3({ error: "内容为空" }, 400);
     const recent = this.sql.exec("SELECT COUNT(*) AS n FROM danmaku WHERE iphash = ? AND created > ?", iphash, now - 6e4).one().n;
     if (recent >= 3) return json3({ error: "发送太快，稍等一下" }, 429);
     const id = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
     this.sql.exec(
-      "INSERT INTO danmaku (id, text, color, size, created, iphash, hidden) VALUES (?, ?, ?, ?, ?, ?, 0)",
+      `INSERT INTO danmaku (id, text, color, size, created, iphash, hidden, ip, bfp, dfp)
+       VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`,
       id,
       text2,
       color,
       size,
       now,
-      iphash
+      iphash,
+      clean(body.ip, 45),
+      clean(body.bfp, 32),
+      clean(body.dfp, 32)
     );
     this.sql.exec(
       "DELETE FROM danmaku WHERE id IN (SELECT id FROM danmaku ORDER BY created DESC LIMIT -1 OFFSET ?)",
@@ -2080,46 +2300,44 @@ var Vault = class {
     );
     return json3({ ok: true, item: { id, text: text2, color, size, created: now } });
   }
-  listDanmaku(url) {
-    const limit = Math.min(200, Math.max(1, Number(url.searchParams.get("limit")) || 60));
-    const all = url.searchParams.get("all") === "1";
-    const where = all ? "" : "WHERE hidden = 0";
-    const items = this.sql.exec(`SELECT id, text, color, size, created FROM danmaku ${where} ORDER BY created DESC LIMIT ?`, limit).toArray();
-    return json3({ items: items.reverse() });
-  }
-  removeDanmaku(body) {
-    this.sql.exec("DELETE FROM danmaku WHERE id = ?", String(body.id || ""));
-    return json3({ ok: true });
-  }
   /* ------------------------------------------------------------ 图片 */
   addUpload(body) {
     const id = String(body.id || "");
     if (!/^[a-z0-9]{16,32}$/.test(id)) return json3({ error: "id 非法" }, 400);
-    const iphash = String(body.iphash || "").slice(0, 64);
+    const ip = clean(body.ip, 45);
+    if (ip && this.sql.exec("SELECT 1 AS hit FROM blocks WHERE ip = ?", ip).toArray().length) {
+      return json3({ error: "该 IP 已被限制上传", blocked: true }, 403);
+    }
+    const iphash = clean(body.iphash, 64);
     const now = Date.now();
     const recent = this.sql.exec("SELECT COUNT(*) AS n FROM uploads WHERE iphash = ? AND created > ?", iphash, now - 36e5).one().n;
     if (recent >= 8) return json3({ error: "上传太频繁，一小时后再试" }, 429);
     this.sql.exec(
-      "INSERT INTO uploads (id, mime, bytes, created, iphash, title, hidden) VALUES (?, ?, ?, ?, ?, ?, 0)",
+      `INSERT INTO uploads (id, mime, bytes, created, iphash, title, hidden, ip, bfp, dfp)
+       VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`,
       id,
-      String(body.mime || "image/jpeg"),
+      clean(body.mime, 40) || "image/jpeg",
       Number(body.bytes) || 0,
       now,
       iphash,
-      String(body.title || "").slice(0, 60)
+      clean(body.title, 60),
+      ip,
+      clean(body.bfp, 32),
+      clean(body.dfp, 32)
     );
     return json3({ ok: true, item: { id, mime: body.mime, bytes: Number(body.bytes) || 0, created: now } });
   }
-  listUploads(url) {
-    const limit = Math.min(200, Math.max(1, Number(url.searchParams.get("limit")) || 60));
-    const all = url.searchParams.get("all") === "1";
-    const where = all ? "" : "WHERE hidden = 0";
-    const items = this.sql.exec(`SELECT id, mime, bytes, created, title FROM uploads ${where} ORDER BY created DESC LIMIT ?`, limit).toArray();
-    return json3({ items });
-  }
-  removeUpload(body) {
-    this.sql.exec("DELETE FROM uploads WHERE id = ?", String(body.id || ""));
-    return json3({ ok: true });
+  /* ---------------------------------------------------------- 黑名单 */
+  addBlock(body) {
+    const ip = clean(body.ip, 45);
+    if (!ip) return json3({ error: "缺少 IP" }, 400);
+    this.sql.exec(
+      "INSERT OR REPLACE INTO blocks (ip, created, reason) VALUES (?, ?, ?)",
+      ip,
+      Date.now(),
+      clean(body.reason, 80)
+    );
+    return json3({ ok: true, ip });
   }
   /* ---------------------------------------------------------- passkey */
   addPasskey(body) {
@@ -2132,7 +2350,7 @@ var Vault = class {
       Number(body.alg) || -7,
       Number(body.signCount) || 0,
       Date.now(),
-      String(body.name || "这台电脑").slice(0, 40)
+      clean(body.name, 40) || "这台电脑"
     );
     return json3({ ok: true, id });
   }

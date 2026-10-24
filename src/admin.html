@@ -130,6 +130,7 @@
       <button role="tab" aria-selected="true" data-tab="danmaku">弹幕</button>
       <button role="tab" aria-selected="false" data-tab="uploads">图片</button>
       <button role="tab" aria-selected="false" data-tab="keys">密钥</button>
+      <button role="tab" aria-selected="false" data-tab="blocks">黑名单</button>
       <button id="btn-logout" type="button" style="margin-left:auto">退出</button>
     </div>
     <div class="card">
@@ -162,7 +163,7 @@
 
   let state = { authed: false, passkeys: [], rpId: "", vault: false, uploads: false };
   let tab = "danmaku";
-  let cache = { danmaku: [], uploads: [] };
+  let cache = { danmaku: [], uploads: [], blocks: [] };
 
   function say(id, text, kind) {
     const el = $(id);
@@ -362,8 +363,12 @@
 
   async function loadList() {
     try {
-      const data = await api("/list");
-      cache = { danmaku: data.danmaku || [], uploads: data.uploads || [] };
+      const [data, blocked] = await Promise.all([api("/list"), api("/blocks").catch(() => ({ items: [] }))]);
+      cache = {
+        danmaku: data.danmaku || [],
+        uploads: data.uploads || [],
+        blocks: blocked.items || [],
+      };
       render();
     } catch (err) {
       say("panel-status", "读取失败：" + explain(err), "err");
@@ -380,9 +385,32 @@
     let items = [];
 
     if (tab === "danmaku") {
-      items = cache.danmaku.map((d) => ({ kind: "danmaku", id: d.id, title: d.text, meta: d.color + " · " + d.size + "px · " + when(d.created) }));
+      items = cache.danmaku.map((d) => ({
+        kind: "danmaku",
+        id: d.id,
+        title: d.text,
+        meta: d.color + " · " + d.size + "px · " + when(d.created) + " · IP " + (d.ip || "—") +
+          (d.bfp ? " · 指纹 " + d.bfp + "/" + (d.dfp || "—") : ""),
+        ip: d.ip || "",
+      }));
     } else if (tab === "uploads") {
-      items = cache.uploads.map((u) => ({ kind: "upload", id: u.id, title: u.title || u.id, meta: u.mime + " · " + (u.bytes / 1024).toFixed(1) + " KB · " + when(u.created), thumb: "/img/" + u.id }));
+      items = cache.uploads.map((u) => ({
+        kind: "upload",
+        id: u.id,
+        title: u.title || u.id,
+        meta: u.mime + " · " + (u.bytes / 1024).toFixed(1) + " KB · " + when(u.created) +
+          " · IP " + (u.ip || "—") +
+          (u.bfp ? " · 指纹 " + u.bfp + "/" + (u.dfp || "—") : ""),
+        thumb: "/img/" + u.id,
+        ip: u.ip || "",
+      }));
+    } else if (tab === "blocks") {
+      items = cache.blocks.map((b) => ({
+        kind: "block",
+        id: b.ip,
+        title: b.ip,
+        meta: "加入于 " + when(b.created) + (b.reason ? " · " + b.reason : "") + " · 该 IP 无法上传图片",
+      }));
     } else {
       items = state.passkeys.map((k) => ({ kind: "passkey", id: k.id, title: k.name || k.id.slice(0, 12), meta: "注册于 " + when(k.created) }));
     }
@@ -408,6 +436,53 @@
       meta.append(b, sp);
       li.appendChild(meta);
 
+      const actions = [];
+
+      if (item.kind === "upload" && item.ip) {
+        actions.push({
+          label: "拉黑",
+          className: "",
+          onClick: async () => {
+            const ok = window.confirm("确认拉黑该 IP？\n\n" + item.ip + "\n\n拉黑后该 IP 无法上传图片（弹幕不受影响），可在「黑名单」里解除。");
+            if (!ok) return;
+            await api("/block", { method: "POST", body: { ip: item.ip, reason: "手动拉黑" } });
+            say("panel-status", "已拉黑 " + item.ip, "ok");
+            await refresh();
+          },
+        });
+      }
+
+      if (item.kind === "block") {
+        actions.push({
+          label: "解除",
+          className: "",
+          onClick: async () => {
+            const ok = window.confirm("确认解除对该 IP 的上传限制？\n\n" + item.ip);
+            if (!ok) return;
+            await api("/unblock", { method: "POST", body: { ip: item.ip } });
+            say("panel-status", "已解除 " + item.ip, "ok");
+            await refresh();
+          },
+        });
+      }
+
+      for (const act of actions) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.textContent = act.label;
+        if (act.className) btn.className = act.className;
+        btn.addEventListener("click", async () => {
+          btn.disabled = true;
+          try {
+            await act.onClick();
+          } catch (err) {
+            say("panel-status", act.label + "失败：" + explain(err), "err");
+            btn.disabled = false;
+          }
+        });
+        li.appendChild(btn);
+      }
+
       const del = document.createElement("button");
       del.type = "button";
       del.className = "danger";
@@ -424,7 +499,7 @@
           del.disabled = false;
         }
       });
-      li.appendChild(del);
+      if (item.kind !== "block") li.appendChild(del);
       list.appendChild(li);
     }
   }

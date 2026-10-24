@@ -161,11 +161,15 @@ export async function handleDanmakuPost(request, env, url, cfg) {
   const ip = request.headers.get("cf-connecting-ip") || "0.0.0.0";
   const iphash = await sha256Hex(`${ip}|${cfg.apiSecret || ""}`);
 
+  const fp = fingerprintsOf(request);
   const res = await vaultPost(env, "/danmaku", {
     text: body.text,
     color: body.color,
     size: body.size,
     iphash,
+    ip,
+    bfp: fp.bfp,
+    dfp: fp.dfp,
   });
   if (!res) return json({ error: "写入失败" }, 500);
   if (res.error) return json({ error: res.error }, res.error.includes("太快") ? 429 : 400);
@@ -207,11 +211,22 @@ export async function handleUploadPost(request, env, url, cfg) {
 
   const ip = request.headers.get("cf-connecting-ip") || "0.0.0.0";
   const iphash = await sha256Hex(`${ip}|${cfg.apiSecret || ""}`);
-  const rec = await vaultPost(env, "/upload", { id, mime: kind.mime, bytes: buf.length, iphash, title });
+  const fp = fingerprintsOf(request);
+  const rec = await vaultRaw(env, "/upload", {
+    id,
+    mime: kind.mime,
+    bytes: buf.length,
+    iphash,
+    title,
+    ip,
+    bfp: fp.bfp,
+    dfp: fp.dfp,
+  });
 
-  if (!rec || rec.error) {
+  if (rec.status !== 200 || !rec.data || rec.data.error) {
     await env.UPLOADS.delete(`img:${id}`);
-    return json({ error: (rec && rec.error) || "记录失败" }, 429);
+    const code = rec.status === 403 ? 403 : rec.status === 429 ? 429 : 500;
+    return json({ error: (rec.data && rec.data.error) || "记录失败", blocked: code === 403 }, code);
   }
   return json({ ok: true, item: { id, mime: kind.mime, bytes: buf.length, title } }, 201);
 }
@@ -441,6 +456,27 @@ export async function handleAdminApi(request, env, url, cfg) {
     return json({ error: "kind 非法" }, 400);
   }
 
+  if (path === "/blocks" && request.method === "GET") {
+    const list = (await vaultCall(env, "/blocks")) || { items: [] };
+    return json({ items: list.items || [] });
+  }
+
+  if (path === "/block" && request.method === "POST") {
+    const body = await request.json().catch(() => ({}));
+    const ip = String(body.ip || "").slice(0, 45);
+    if (!ip) return json({ error: "缺少 IP" }, 400);
+    await vaultPost(env, "/block", { ip, reason: String(body.reason || "").slice(0, 80) });
+    return json({ ok: true, ip });
+  }
+
+  if (path === "/unblock" && request.method === "POST") {
+    const body = await request.json().catch(() => ({}));
+    const ip = String(body.ip || "").slice(0, 45);
+    if (!ip) return json({ error: "缺少 IP" }, 400);
+    await vaultPost(env, "/unblock", { ip });
+    return json({ ok: true, ip });
+  }
+
   if (path === "/passkey/remove" && request.method === "POST") {
     const body = await request.json().catch(() => ({}));
     await vaultPost(env, "/passkey/remove", { id: String(body.id || "") });
@@ -448,4 +484,27 @@ export async function handleAdminApi(request, env, url, cfg) {
   }
 
   return notFound();
+}
+
+/* -------------------------------- 追加：指纹与原始返回（函数声明会提升） */
+
+/** 需要区分状态码时用这个：黑名单拦截回 403，要如实告诉前端 */
+async function vaultRaw(env, path, body) {
+  const stub = vault(env);
+  if (!stub) return { status: 503, data: { error: "Vault 未就绪" } };
+  const res = await stub.fetch("https://vault.internal" + path, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  return { status: res.status, data: await res.json().catch(() => ({})) };
+}
+
+/** 客户端算的两枚指纹：bfp=浏览器、dfp=设备；只校验格式，不参与拦截 */
+function fingerprintsOf(request) {
+  const ok = (v) => (/^[a-f0-9]{8,32}$/i.test(v || "") ? v.toLowerCase() : "");
+  return {
+    bfp: ok(request.headers.get("x-bfp") || ""),
+    dfp: ok(request.headers.get("x-dfp") || ""),
+  };
 }
