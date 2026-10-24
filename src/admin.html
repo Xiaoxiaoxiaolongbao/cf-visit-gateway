@@ -86,6 +86,18 @@
   .empty { color: var(--soft); font-size: 12.5px; padding: 10px 0; }
   .hide { display: none !important; }
 
+  .msg-body {
+    margin: 8px 0 10px; padding: 10px 12px; border-radius: 9px; background: rgba(255,255,255,.03);
+    border: 1px solid var(--hair); font-size: 13px; line-height: 1.75; white-space: pre-wrap; word-break: break-word;
+  }
+  .reply-input {
+    width: 100%; min-height: 58px; padding: 9px 12px; border-radius: 9px; resize: vertical;
+    border: 1px solid var(--hair2); background: rgba(255,255,255,.03); color: var(--fg);
+    font: inherit; font-size: 13px; line-height: 1.7;
+  }
+  .reply-input:focus { outline: 2px solid var(--hair2); outline-offset: 1px; }
+  .msg-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
+
   /* 站内确认弹窗（替代原生 confirm） */
   .ask { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; padding: 22px; }
   .ask[hidden] { display: none; }
@@ -163,6 +175,7 @@
       <button role="tab" aria-selected="true" data-tab="danmaku">弹幕</button>
       <button role="tab" aria-selected="false" data-tab="uploads">图片</button>
       <button role="tab" aria-selected="false" data-tab="keys">密钥</button>
+      <button role="tab" aria-selected="false" data-tab="messages">私信</button>
       <button role="tab" aria-selected="false" data-tab="blocks">黑名单</button>
       <button id="btn-logout" type="button" style="margin-left:auto">退出</button>
     </div>
@@ -196,7 +209,7 @@
 
   let state = { authed: false, passkeys: [], rpId: "", vault: false, uploads: false };
   let tab = "danmaku";
-  let cache = { danmaku: [], uploads: [], blocks: [] };
+  let cache = { danmaku: [], uploads: [], blocks: [], messages: [] };
 
   /** 站内确认弹窗，替代 window.confirm（返回 Promise<boolean>） */
   function askConfirm(options) {
@@ -434,11 +447,16 @@
 
   async function loadList() {
     try {
-      const [data, blocked] = await Promise.all([api("/list"), api("/blocks").catch(() => ({ items: [] }))]);
+      const [data, blocked, msgs] = await Promise.all([
+        api("/list"),
+        api("/blocks").catch(() => ({ items: [] })),
+        api("/messages").catch(() => ({ items: [] })),
+      ]);
       cache = {
         danmaku: data.danmaku || [],
         uploads: data.uploads || [],
         blocks: blocked.items || [],
+        messages: msgs.items || [],
       };
       render();
     } catch (err) {
@@ -454,6 +472,86 @@
     const list = $("list");
     list.innerHTML = "";
     let items = [];
+
+    if (tab === "messages") {
+      $("empty").classList.toggle("hide", cache.messages.length > 0);
+      for (const m of cache.messages) {
+        const li = document.createElement("li");
+        li.style.flexDirection = "column";
+        li.style.alignItems = "stretch";
+
+        const meta = document.createElement("div");
+        meta.className = "meta";
+        const b = document.createElement("b");
+        b.textContent = (m.name || "匿名") + (m.contact ? " · " + m.contact : "");
+        const sp = document.createElement("span");
+        sp.textContent =
+          when(m.created) + " · IP " + (m.ip || "—") +
+          (m.bfp ? " · 指纹 " + m.bfp + "/" + (m.dfp || "—") : "") +
+          (m.replied ? " · 已回复" : " · 待回复");
+        meta.append(b, sp);
+        li.appendChild(meta);
+
+        const body = document.createElement("div");
+        body.className = "msg-body";
+        body.textContent = m.body;
+        li.appendChild(body);
+
+        const ta = document.createElement("textarea");
+        ta.className = "reply-input";
+        ta.placeholder = "回复内容（会显示给留言者，最多 500 字）";
+        ta.maxLength = 500;
+        ta.value = m.reply || "";
+        li.appendChild(ta);
+
+        const actions = document.createElement("div");
+        actions.className = "msg-actions";
+        const send = document.createElement("button");
+        send.type = "button";
+        send.className = "primary";
+        send.textContent = m.replied ? "更新回复" : "回复";
+        send.addEventListener("click", async () => {
+          send.disabled = true;
+          try {
+            await api("/message/reply", { method: "POST", body: { id: m.id, reply: ta.value } });
+            say("panel-status", "回复已保存", "ok");
+            await refresh();
+          } catch (err) {
+            say("panel-status", "保存失败：" + explain(err), "err");
+            send.disabled = false;
+          }
+        });
+        actions.appendChild(send);
+
+        const drop = document.createElement("button");
+        drop.type = "button";
+        drop.className = "danger";
+        drop.textContent = "删除";
+        drop.addEventListener("click", async () => {
+          const ok = await askConfirm({
+            title: "删除这条私信？",
+            body: (m.name || "匿名") + "：" + String(m.body).slice(0, 60) + (String(m.body).length > 60 ? "…" : ""),
+            okLabel: "删除",
+          });
+          if (!ok) return;
+          drop.disabled = true;
+          try {
+            await api("/delete", { method: "POST", body: { kind: "message", id: m.id } });
+            say("panel-status", "已删除", "ok");
+            await refresh();
+          } catch (err) {
+            say("panel-status", "删除失败：" + explain(err), "err");
+            drop.disabled = false;
+          }
+        });
+        actions.appendChild(drop);
+
+        li.appendChild(actions);
+
+        list.appendChild(li);
+      }
+      return;
+    }
 
     if (tab === "danmaku") {
       items = cache.danmaku.map((d) => ({

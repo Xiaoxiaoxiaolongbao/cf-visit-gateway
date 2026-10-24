@@ -23,6 +23,13 @@ const DDL = [
      id TEXT PRIMARY KEY, jwk TEXT NOT NULL, alg INTEGER NOT NULL,
      signcount INTEGER NOT NULL DEFAULT 0, created INTEGER NOT NULL, name TEXT NOT NULL DEFAULT ''
    )`,
+  `CREATE TABLE IF NOT EXISTS messages (
+     id TEXT PRIMARY KEY, code TEXT NOT NULL, name TEXT NOT NULL DEFAULT '',
+     contact TEXT NOT NULL DEFAULT '', body TEXT NOT NULL, created INTEGER NOT NULL,
+     ip TEXT NOT NULL DEFAULT '', bfp TEXT NOT NULL DEFAULT '', dfp TEXT NOT NULL DEFAULT '',
+     reply TEXT NOT NULL DEFAULT '', replied INTEGER NOT NULL DEFAULT 0
+   )`,
+  `CREATE INDEX IF NOT EXISTS messages_created ON messages (created DESC)`,
   `CREATE TABLE IF NOT EXISTS blocks (
      ip TEXT PRIMARY KEY, created INTEGER NOT NULL, reason TEXT NOT NULL DEFAULT ''
    )`,
@@ -83,6 +90,13 @@ export class Vault {
           case "/uploads/remove":
             this.sql.exec("DELETE FROM uploads WHERE id = ?", String(body.id || ""));
             return json({ ok: true });
+          case "/message":
+            return this.addMessage(body);
+          case "/messages/reply":
+            return this.replyMessage(body);
+          case "/messages/remove":
+            this.sql.exec("DELETE FROM messages WHERE id = ?", String(body.id || ""));
+            return json({ ok: true });
           case "/block":
             return this.addBlock(body);
           case "/unblock":
@@ -123,6 +137,24 @@ export class Vault {
             .exec(`SELECT ${cols} FROM uploads ${where} ORDER BY created DESC LIMIT ?`, limit)
             .toArray();
           return json({ items });
+        }
+        case "/messages": {
+          const limit = Math.min(200, Math.max(1, Number(url.searchParams.get("limit")) || 60));
+          return json({
+            items: this.sql
+              .exec(
+                "SELECT id, code, name, contact, body, created, ip, bfp, dfp, reply, replied FROM messages ORDER BY created DESC LIMIT ?",
+                limit,
+              )
+              .toArray(),
+          });
+        }
+        case "/message": {
+          const code = String(url.searchParams.get("code") || "");
+          const rows = this.sql
+            .exec("SELECT body, reply, replied, created FROM messages WHERE code = ?", code)
+            .toArray();
+          return json({ item: rows[0] || null });
         }
         case "/blocks":
           return json({ items: this.sql.exec("SELECT ip, created, reason FROM blocks ORDER BY created DESC").toArray() });
@@ -256,3 +288,60 @@ export class Vault {
     return json({ ok: true, id });
   }
 }
+
+/* -------------------------------- 站长私信 */
+
+const MAX_MESSAGE = 500;
+
+Object.assign(Vault.prototype, {
+  addMessage(body) {
+    const text = clean(body.body, MAX_MESSAGE).trim();
+    if (!text) return json({ error: "内容为空" }, 400);
+
+    const ip = clean(body.ip, 45);
+    if (ip && this.sql.exec("SELECT 1 AS hit FROM blocks WHERE ip = ?", ip).toArray().length) {
+      return json({ error: "该网络已被限制提交", blocked: true }, 403);
+    }
+
+    const now = Date.now();
+    if (ip) {
+      const recent = this.sql
+        .exec("SELECT COUNT(*) AS n FROM messages WHERE ip = ? AND created > ?", ip, now - 3600000)
+        .one().n;
+      if (recent >= 5) return json({ error: "提交太频繁，一小时后再试" }, 429);
+    }
+
+    const id = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
+    const code = [...crypto.getRandomValues(new Uint8Array(5))]
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+
+    this.sql.exec(
+      `INSERT INTO messages (id, code, name, contact, body, created, ip, bfp, dfp, reply, replied)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '', 0)`,
+      id,
+      code,
+      clean(body.name, 20),
+      clean(body.contact, 60),
+      text,
+      now,
+      ip,
+      clean(body.bfp, 32),
+      clean(body.dfp, 32),
+    );
+    return json({ ok: true, id, code });
+  },
+
+  replyMessage(body) {
+    const id = String(body.id || "");
+    const reply = clean(body.reply, MAX_MESSAGE).trim();
+    if (!id) return json({ error: "缺少 id" }, 400);
+    this.sql.exec(
+      "UPDATE messages SET reply = ?, replied = ? WHERE id = ?",
+      reply,
+      reply ? 1 : 0,
+      id,
+    );
+    return json({ ok: true });
+  },
+});
