@@ -232,6 +232,74 @@ await it("webauthn：DER 签名转 raw 后长度正确、CBOR 能解出 COSE 结
   assert.deepEqual([...b64uDecode(b64uEncode(bytes))], [...bytes]);
 });
 
+await it("黑名单：被拦截的 IP 上传返回 403，且 KV 不残留", async () => {
+  const kv = kvStub();
+  const e = env({
+    VAULT: vaultStub((path) => (path === "/upload" ? { error: "该 IP 已被限制上传", blocked: true } : { items: [] })),
+    UPLOADS: kv,
+  });
+  // vaultStub 固定返回 200，这里改成 403 需要自定义
+  const e2 = {
+    ...e,
+    VAULT: {
+      idFromName: () => "stub",
+      get: () => ({
+        fetch: async () =>
+          new Response(JSON.stringify({ error: "该 IP 已被限制上传", blocked: true }), {
+            status: 403,
+            headers: { "content-type": "application/json" },
+          }),
+      }),
+    },
+  };
+  const png = readFileSync(resolve(ROOT, "assets/favicon.png"));
+  const res = await call("/api/wall/upload", { method: "POST", headers: { "content-type": "image/png" }, body: png }, e2);
+  assert.equal(res.status, 403);
+  const data = await res.json();
+  assert.equal(data.blocked, true);
+  assert.ok(/限制上传/.test(data.error));
+  assert.equal(kv.map.size, 0, "被拒绝时不应在 KV 留下图片");
+});
+
+await it("指纹：上传与弹幕都会把 x-bfp / x-dfp 传给 Vault", async () => {
+  const seen = [];
+  const e = env({
+    VAULT: vaultStub((path, body) => {
+      seen.push({ path, body });
+      return path === "/upload" ? { ok: true, item: { id: "abcdefabcdefabcd" } } : { ok: true, item: { id: "abc", text: "x", color: "#fff", size: 15, created: 1 } };
+    }),
+    UPLOADS: kvStub(),
+  });
+
+  const png = readFileSync(resolve(ROOT, "assets/favicon.png"));
+  await call("/api/wall/upload", {
+    method: "POST",
+    headers: { "content-type": "image/png", "x-bfp": "1111aaaa", "x-dfp": "2222bbbb", "cf-connecting-ip": "9.9.9.9" },
+    body: png,
+  }, e);
+
+  await call("/api/wall/danmaku", {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-bfp": "3333cccc", "x-dfp": "4444dddd", "cf-connecting-ip": "9.9.9.9" },
+    body: JSON.stringify({ text: "hi", color: "#ffffff", size: 15 }),
+  }, e);
+
+  const up = seen.find((s) => s.path === "/upload");
+  const dm = seen.find((s) => s.path === "/danmaku");
+  assert.equal(up.body.bfp, "1111aaaa");
+  assert.equal(up.body.dfp, "2222bbbb");
+  assert.equal(up.body.ip, "9.9.9.9");
+  assert.equal(dm.body.bfp, "3333cccc");
+  assert.equal(dm.body.dfp, "4444dddd");
+  assert.equal(dm.body.ip, "9.9.9.9");
+});
+
+await it("黑名单：管理接口未登录一律 401", async () => {
+  const e = env({ VAULT: vaultStub(() => ({ items: [] })) });
+  assert.equal((await call("/admin/api/blocks", {}, e)).status, 401);
+  const post = await call("/admin/api/block", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ip: "1.2.3.4" }) }, e);
+  assert.equal(post.status, 401);
+});
 /* ------------------------------------------------------------------ 汇总 */
 
 let pass = 0;

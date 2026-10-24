@@ -520,6 +520,31 @@
     <p class="upload-note">上传后会出现在上方「奶蛙中学风采 · 自主上传」里，任何人可见；管理员可在 /admin 删除。</p>
   </section>
 </main>
+
+  <div class="confirm" id="up-confirm" role="dialog" aria-modal="true" aria-labelledby="up-confirm-title" hidden>
+    <div class="confirm-scrim" data-cancel></div>
+    <div class="confirm-panel">
+      <h2 id="up-confirm-title">确认上传</h2>
+      <p class="confirm-note">您正在上传照片，如有违规内容会被拦截，并限制您的上传。</p>
+      <p class="confirm-consent">上传即同意<button class="linkbtn" id="open-terms" type="button">《用户协议》</button></p>
+      <details class="terms" id="terms-box">
+        <summary>用户协议（点击展开）</summary>
+        <ol>
+          <li><b>公开范围</b>：你上传的图片会出现在「奶蛙中学风采 · 自主上传」中，发送的弹幕会在首页飘过，均对所有人可见。</li>
+          <li><b>内容规范</b>：不得上传或发布引战、谩骂、侮辱、歧视、色情、暴力、违法内容，以及侵犯他人肖像权、著作权等权益的内容。</li>
+          <li><b>管理员处置权</b>：管理员有权对引战、谩骂等不良图片与弹幕直接删除，并可视情节限制该来源继续上传。</li>
+          <li><b>记录范围</b>：为便于审核与追溯，管理员会对每一条信息记录发送者的 <b>IP 地址</b>、<b>浏览器指纹</b>、<b>设备指纹</b>，以及与该信息相关的合法内容（时间、正文、颜色字号、图片类型与大小等）。</li>
+          <li><b>记录用途</b>：上述记录仅用于内容审核、违规处理与必要的责任追溯，不会对外公开，也不会用于广告投放。</li>
+          <li><b>违规后果</b>：违规内容将被删除；对同一来源，管理员可将其 IP 加入黑名单，限制其上传图片。</li>
+          <li><b>协议变更</b>：本协议可能更新，更新后继续使用即视为接受新版本。</li>
+        </ol>
+      </details>
+      <div class="confirm-actions">
+        <button id="up-cancel" type="button">取消</button>
+        <button id="up-ok" class="primary" type="button">同意并上传</button>
+      </div>
+    </div>
+  </div>
   <div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-labelledby="lightbox-title" hidden>
     <div class="lightbox-scrim" data-close></div>
     <div class="lightbox-panel">
@@ -835,7 +860,7 @@
         send.disabled = true;
         fetch("/api/wall/danmaku", {
           method: "POST",
-          headers: { "content-type": "application/json" },
+          headers: { "content-type": "application/json", "x-bfp": fp.bfp, "x-dfp": fp.dfp },
           credentials: "same-origin",
           body: JSON.stringify({ text: value, color: picked, size: sizes[sizeIndex] }),
         })
@@ -887,16 +912,114 @@
       if (send) send.addEventListener("click", post);
       if (text) text.addEventListener("keydown", function (e) { if (e.key === "Enter") post(); });
 
+      /* 双指纹：仅用于事后对比，不参与任何拦截 */
+      var fp = { bfp: "", dfp: "" };
+      function hash32(str) {
+        var h = 0x811c9dc5;
+        for (var i = 0; i < str.length; i += 1) {
+          h ^= str.charCodeAt(i);
+          h = (h * 0x01000193) >>> 0;
+        }
+        return ("00000000" + h.toString(16)).slice(-8);
+      }
+      function canvasSig() {
+        try {
+          var c = document.createElement("canvas");
+          c.width = 200; c.height = 40;
+          var g = c.getContext("2d");
+          g.textBaseline = "top";
+          g.font = "16px Arial";
+          g.fillStyle = "#f60"; g.fillRect(0, 0, 100, 20);
+          g.fillStyle = "#069"; g.fillText("naiwa-fp-中", 2, 22);
+          g.strokeStyle = "rgba(0,0,0,.4)";
+          g.beginPath(); g.arc(50, 20, 15, 0, Math.PI * 2); g.stroke();
+          return c.toDataURL().slice(-140);
+        } catch (e) { return "nocanvas"; }
+      }
+      function webglSig() {
+        try {
+          var c = document.createElement("canvas");
+          var gl = c.getContext("webgl") || c.getContext("experimental-webgl");
+          if (!gl) return "nogl";
+          var ext = gl.getExtension("WEBGL_debug_renderer_info");
+          return [
+            gl.getParameter(gl.VENDOR), gl.getParameter(gl.RENDERER),
+            ext ? gl.getParameter(ext.UNMASKED_VENDOR_WEBGL) : "",
+            ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : "",
+          ].join("|");
+        } catch (e) { return "nogl"; }
+      }
+      function computeFp() {
+        try {
+          var nav = window.navigator;
+          var scr = window.screen;
+          fp.bfp = hash32([
+            nav.userAgent, nav.language, (nav.languages || []).join(","),
+            nav.plugins ? nav.plugins.length : 0, nav.hardwareConcurrency || 0,
+            (window.Intl && Intl.DateTimeFormat().resolvedOptions().timeZone) || "",
+            scr.colorDepth, canvasSig(), webglSig(),
+          ].join("~"));
+          fp.dfp = hash32([
+            scr.width, scr.height, scr.availWidth, scr.availHeight,
+            window.devicePixelRatio || 1, nav.platform || "",
+            nav.maxTouchPoints || 0, nav.deviceMemory || 0,
+            nav.hardwareConcurrency || 0,
+            nav.userAgentData && nav.userAgentData.mobile ? 1 : 0,
+          ].join("~"));
+        } catch (e) { /* 指纹算不出来也不影响上传 */ }
+      }
+      computeFp();
+
       /* 上传 */
       var zone = byId("dropzone");
       var input = byId("file-input");
+      var pending = null;
+      var confirmBox = byId("up-confirm");
+
+      function askConfirm(file) {
+        if (!file) return;
+        if (file.size > 10 * 1024 * 1024) { say("超过 10MB，换小一点的"); return; }
+        pending = file;
+        if (!confirmBox) { upload(file); return; }
+        confirmBox.hidden = false;
+        document.documentElement.style.overflow = "hidden";
+      }
+      function closeConfirm() {
+        if (confirmBox) confirmBox.hidden = true;
+        document.documentElement.style.overflow = "";
+        pending = null;
+      }
+      if (confirmBox) {
+        var okBtn = byId("up-ok");
+        var cancelBtn = byId("up-cancel");
+        var termsBtn = byId("open-terms");
+        var termsBox = byId("terms-box");
+        if (okBtn) okBtn.addEventListener("click", function () {
+          var f = pending;
+          closeConfirm();
+          if (f) upload(f);
+        });
+        if (cancelBtn) cancelBtn.addEventListener("click", closeConfirm);
+        if (termsBtn && termsBox) termsBtn.addEventListener("click", function () {
+          termsBox.open = !termsBox.open;
+          termsBox.scrollIntoView({ block: "nearest", behavior: "smooth" });
+        });
+        confirmBox.addEventListener("click", function (e) {
+          var el = e.target;
+          if (el && el.nodeType === 1 && el.hasAttribute("data-cancel")) closeConfirm();
+        });
+        document.addEventListener("keydown", function (e) {
+          if (e.key === "Escape" && !confirmBox.hidden) closeConfirm();
+        });
+      }
+
       function upload(file) {
         if (!file) return;
         if (file.size > 10 * 1024 * 1024) { say("超过 10MB，换小一点的"); return; }
         say("正在上传 " + Math.round(file.size / 1024) + " KB…");
         fetch("/api/wall/upload", {
           method: "POST",
-          headers: { "content-type": file.type || "application/octet-stream" },
+          headers: { "content-type": file.type || "application/octet-stream", "x-bfp": fp.bfp, "x-dfp": fp.dfp },
           credentials: "same-origin",
           body: file,
         })
@@ -917,7 +1040,10 @@
           })
           .catch(function () { say("上传出错，稍后再试"); });
       }
-      if (input) input.addEventListener("change", function () { upload(input.files && input.files[0]); });
+      if (input) input.addEventListener("change", function () {
+        askConfirm(input.files && input.files[0]);
+        input.value = "";
+      });
       if (zone) {
         ["dragenter", "dragover"].forEach(function (ev) {
           zone.addEventListener(ev, function (e) { e.preventDefault(); zone.classList.add("over"); });
@@ -927,7 +1053,7 @@
         });
         zone.addEventListener("drop", function (e) {
           var file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
-          upload(file);
+          askConfirm(file);
         });
       }
 

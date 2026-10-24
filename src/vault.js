@@ -1,8 +1,11 @@
 /**
- * Vault：留言（弹幕）、上传图片的元信息、passkey 凭据，三张表放在同一个 SQLite Durable Object 里。
+ * Vault：留言（弹幕）、上传图片元信息（含 IP 与双指纹）、passkey 凭据、IP 黑名单。
  *
- * 为什么不把图片本身也放这里：DO 的单行有 2MB 上限，10MB 的图会被拒；
- * 图片字节存 KV（25MB/值），这里只存元信息。
+ * 约定：
+ *   - ip 明文只存在这里，只有 admin 接口会回传；公开接口 /api/wall 永不包含
+ *   - 双指纹：bfp = 浏览器指纹（canvas/webgl/ua/语言/时区），dfp = 设备指纹（屏幕/核数/内存/平台）
+ *     按「仅记录对比」的要求，指纹不参与拦截，只落库
+ *   - 黑名单按 IP 只拦上传图片（danmaku 不受影响），表 blocks
  */
 
 const DDL = [
@@ -20,6 +23,19 @@ const DDL = [
      id TEXT PRIMARY KEY, jwk TEXT NOT NULL, alg INTEGER NOT NULL,
      signcount INTEGER NOT NULL DEFAULT 0, created INTEGER NOT NULL, name TEXT NOT NULL DEFAULT ''
    )`,
+  `CREATE TABLE IF NOT EXISTS blocks (
+     ip TEXT PRIMARY KEY, created INTEGER NOT NULL, reason TEXT NOT NULL DEFAULT ''
+   )`,
+];
+
+/** 老库补列：SQLite 不支持 ADD COLUMN IF NOT EXISTS，只能逐句试 */
+const MIGRATIONS = [
+  "ALTER TABLE uploads ADD COLUMN ip TEXT NOT NULL DEFAULT ''",
+  "ALTER TABLE uploads ADD COLUMN bfp TEXT NOT NULL DEFAULT ''",
+  "ALTER TABLE uploads ADD COLUMN dfp TEXT NOT NULL DEFAULT ''",
+  "ALTER TABLE danmaku ADD COLUMN ip TEXT NOT NULL DEFAULT ''",
+  "ALTER TABLE danmaku ADD COLUMN bfp TEXT NOT NULL DEFAULT ''",
+  "ALTER TABLE danmaku ADD COLUMN dfp TEXT NOT NULL DEFAULT ''",
 ];
 
 const MAX_DANMAKU = 400;
@@ -30,12 +46,21 @@ const json = (body, status = 200) =>
     headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
   });
 
+const clean = (value, max) => String(value == null ? "" : value).slice(0, max);
+
 export class Vault {
   constructor(state) {
     this.state = state;
     this.sql = state.storage.sql;
     this.ready = state.blockConcurrencyWhile(async () => {
       for (const ddl of DDL) this.sql.exec(ddl);
+      for (const sql of MIGRATIONS) {
+        try {
+          this.sql.exec(sql);
+        } catch {
+          /* 列已存在，忽略 */
+        }
+      }
     });
   }
 
@@ -51,18 +76,25 @@ export class Vault {
           case "/danmaku":
             return this.addDanmaku(body);
           case "/danmaku/remove":
-            return this.removeDanmaku(body);
+            this.sql.exec("DELETE FROM danmaku WHERE id = ?", String(body.id || ""));
+            return json({ ok: true });
           case "/upload":
             return this.addUpload(body);
           case "/uploads/remove":
-            return this.removeUpload(body);
+            this.sql.exec("DELETE FROM uploads WHERE id = ?", String(body.id || ""));
+            return json({ ok: true });
+          case "/block":
+            return this.addBlock(body);
+          case "/unblock":
+            this.sql.exec("DELETE FROM blocks WHERE ip = ?", String(body.ip || ""));
+            return json({ ok: true });
           case "/passkey":
             return this.addPasskey(body);
           case "/passkey/counter":
             this.sql.exec("UPDATE passkeys SET signcount = ? WHERE id = ?", Number(body.signCount) || 0, String(body.id));
             return json({ ok: true });
           case "/passkey/remove":
-            this.sql.exec("DELETE FROM passkeys WHERE id = ?", String(body.id));
+            this.sql.exec("DELETE FROM passkeys WHERE id = ?", String(body.id || ""));
             return json({ ok: true });
           default:
             return json({ error: "unknown" }, 404);
@@ -70,10 +102,30 @@ export class Vault {
       }
 
       switch (path) {
-        case "/danmaku":
-          return this.listDanmaku(url);
-        case "/uploads":
-          return this.listUploads(url);
+        case "/danmaku": {
+          const limit = Math.min(200, Math.max(1, Number(url.searchParams.get("limit")) || 60));
+          const all = url.searchParams.get("all") === "1";
+          const where = all ? "" : "WHERE hidden = 0";
+          const cols = all ? "id, text, color, size, created, ip, bfp, dfp" : "id, text, color, size, created";
+          const items = this.sql
+            .exec(`SELECT ${cols} FROM danmaku ${where} ORDER BY created DESC LIMIT ?`, limit)
+            .toArray();
+          return json({ items: items.reverse() });
+        }
+        case "/uploads": {
+          const limit = Math.min(200, Math.max(1, Number(url.searchParams.get("limit")) || 60));
+          const all = url.searchParams.get("all") === "1";
+          const where = all ? "" : "WHERE hidden = 0";
+          const cols = all
+            ? "id, mime, bytes, created, title, ip, bfp, dfp"
+            : "id, mime, bytes, created, title";
+          const items = this.sql
+            .exec(`SELECT ${cols} FROM uploads ${where} ORDER BY created DESC LIMIT ?`, limit)
+            .toArray();
+          return json({ items });
+        }
+        case "/blocks":
+          return json({ items: this.sql.exec("SELECT ip, created, reason FROM blocks ORDER BY created DESC").toArray() });
         case "/passkeys":
           return json({ items: this.sql.exec("SELECT id, name, created FROM passkeys ORDER BY created ASC").toArray() });
         case "/passkey": {
@@ -85,6 +137,7 @@ export class Vault {
             danmaku: this.sql.exec("SELECT COUNT(*) AS n FROM danmaku").one().n,
             uploads: this.sql.exec("SELECT COUNT(*) AS n FROM uploads").one().n,
             passkeys: this.sql.exec("SELECT COUNT(*) AS n FROM passkeys").one().n,
+            blocks: this.sql.exec("SELECT COUNT(*) AS n FROM blocks").one().n,
           });
         default:
           return json({ error: "unknown" }, 404);
@@ -97,15 +150,14 @@ export class Vault {
   /* ------------------------------------------------------------ 弹幕 */
 
   addDanmaku(body) {
-    const text = String(body.text || "").trim().slice(0, 60);
+    const text = clean(body.text, 60).trim();
     const color = /^#[0-9a-f]{6}$/i.test(String(body.color || "")) ? String(body.color).toLowerCase() : "#f5f5f7";
     const size = Math.min(28, Math.max(12, Number(body.size) || 15));
-    const iphash = String(body.iphash || "").slice(0, 64);
+    const iphash = clean(body.iphash, 64);
     const now = Date.now();
 
     if (!text) return json({ error: "内容为空" }, 400);
 
-    // 同一来源 60 秒内最多 3 条
     const recent = this.sql
       .exec("SELECT COUNT(*) AS n FROM danmaku WHERE iphash = ? AND created > ?", iphash, now - 60000)
       .one().n;
@@ -113,16 +165,19 @@ export class Vault {
 
     const id = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
     this.sql.exec(
-      "INSERT INTO danmaku (id, text, color, size, created, iphash, hidden) VALUES (?, ?, ?, ?, ?, ?, 0)",
+      `INSERT INTO danmaku (id, text, color, size, created, iphash, hidden, ip, bfp, dfp)
+       VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`,
       id,
       text,
       color,
       size,
       now,
       iphash,
+      clean(body.ip, 45),
+      clean(body.bfp, 32),
+      clean(body.dfp, 32),
     );
 
-    // 只保留最近的 MAX_DANMAKU 条
     this.sql.exec(
       "DELETE FROM danmaku WHERE id IN (SELECT id FROM danmaku ORDER BY created DESC LIMIT -1 OFFSET ?)",
       MAX_DANMAKU,
@@ -130,59 +185,52 @@ export class Vault {
     return json({ ok: true, item: { id, text, color, size, created: now } });
   }
 
-  listDanmaku(url) {
-    const limit = Math.min(200, Math.max(1, Number(url.searchParams.get("limit")) || 60));
-    const all = url.searchParams.get("all") === "1";
-    const where = all ? "" : "WHERE hidden = 0";
-    const items = this.sql
-      .exec(`SELECT id, text, color, size, created FROM danmaku ${where} ORDER BY created DESC LIMIT ?`, limit)
-      .toArray();
-    return json({ items: items.reverse() });
-  }
-
-  removeDanmaku(body) {
-    this.sql.exec("DELETE FROM danmaku WHERE id = ?", String(body.id || ""));
-    return json({ ok: true });
-  }
-
   /* ------------------------------------------------------------ 图片 */
 
   addUpload(body) {
     const id = String(body.id || "");
     if (!/^[a-z0-9]{16,32}$/.test(id)) return json({ error: "id 非法" }, 400);
-    const iphash = String(body.iphash || "").slice(0, 64);
-    const now = Date.now();
 
+    const ip = clean(body.ip, 45);
+    if (ip && this.sql.exec("SELECT 1 AS hit FROM blocks WHERE ip = ?", ip).toArray().length) {
+      return json({ error: "该 IP 已被限制上传", blocked: true }, 403);
+    }
+
+    const iphash = clean(body.iphash, 64);
+    const now = Date.now();
     const recent = this.sql
       .exec("SELECT COUNT(*) AS n FROM uploads WHERE iphash = ? AND created > ?", iphash, now - 3600000)
       .one().n;
     if (recent >= 8) return json({ error: "上传太频繁，一小时后再试" }, 429);
 
     this.sql.exec(
-      "INSERT INTO uploads (id, mime, bytes, created, iphash, title, hidden) VALUES (?, ?, ?, ?, ?, ?, 0)",
+      `INSERT INTO uploads (id, mime, bytes, created, iphash, title, hidden, ip, bfp, dfp)
+       VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`,
       id,
-      String(body.mime || "image/jpeg"),
+      clean(body.mime, 40) || "image/jpeg",
       Number(body.bytes) || 0,
       now,
       iphash,
-      String(body.title || "").slice(0, 60),
+      clean(body.title, 60),
+      ip,
+      clean(body.bfp, 32),
+      clean(body.dfp, 32),
     );
     return json({ ok: true, item: { id, mime: body.mime, bytes: Number(body.bytes) || 0, created: now } });
   }
 
-  listUploads(url) {
-    const limit = Math.min(200, Math.max(1, Number(url.searchParams.get("limit")) || 60));
-    const all = url.searchParams.get("all") === "1";
-    const where = all ? "" : "WHERE hidden = 0";
-    const items = this.sql
-      .exec(`SELECT id, mime, bytes, created, title FROM uploads ${where} ORDER BY created DESC LIMIT ?`, limit)
-      .toArray();
-    return json({ items });
-  }
+  /* ---------------------------------------------------------- 黑名单 */
 
-  removeUpload(body) {
-    this.sql.exec("DELETE FROM uploads WHERE id = ?", String(body.id || ""));
-    return json({ ok: true });
+  addBlock(body) {
+    const ip = clean(body.ip, 45);
+    if (!ip) return json({ error: "缺少 IP" }, 400);
+    this.sql.exec(
+      "INSERT OR REPLACE INTO blocks (ip, created, reason) VALUES (?, ?, ?)",
+      ip,
+      Date.now(),
+      clean(body.reason, 80),
+    );
+    return json({ ok: true, ip });
   }
 
   /* ---------------------------------------------------------- passkey */
@@ -197,7 +245,7 @@ export class Vault {
       Number(body.alg) || -7,
       Number(body.signCount) || 0,
       Date.now(),
-      String(body.name || "这台电脑").slice(0, 40),
+      clean(body.name, 40) || "这台电脑",
     );
     return json({ ok: true, id });
   }
