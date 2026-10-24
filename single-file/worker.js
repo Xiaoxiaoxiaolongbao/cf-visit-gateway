@@ -492,10 +492,9 @@ var page_default = `<!DOCTYPE html>
       <img class="naiwa-img" src="/naiwa.jpg" alt="奶蛙" width="512" height="512" decoding="async" fetchpriority="high">
       
     </div>
+    <!-- 弹幕带：在相框之外、头像容器之内 —— 既能浮在奶蛙上，又不会被圆的 border-radius 裁掉 -->
+    <div class="danmaku-layer" id="dm-layer" aria-hidden="true"></div>
   </div>
-
-  <!-- 弹幕带：浮在头像上方，矩形不裁切（放在相框外，否则会被圆裁掉） -->
-  <div class="danmaku-layer" id="dm-layer" aria-hidden="true"></div>
 
   <!-- 展签：本页唯一的玩笑装置，写成博物馆标签的格式 -->
   <p class="plate">
