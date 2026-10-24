@@ -28,7 +28,7 @@
     "secret:admin": "wrangler secret put ADMIN_TOKEN"
   },
   "devDependencies": {
-    "esbuild": "^0.25.0",
+    "esbuild": "^0.28.2",
     "wrangler": "^4.151.3"
   },
   "engines": {
