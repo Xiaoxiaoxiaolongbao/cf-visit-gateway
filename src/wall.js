@@ -162,7 +162,7 @@ export async function handleDanmakuPost(request, env, url, cfg) {
   const iphash = await sha256Hex(`${ip}|${cfg.apiSecret || ""}`);
 
   const fp = fingerprintsOf(request);
-  const res = await vaultPost(env, "/danmaku", {
+  const rec = await vaultRaw(env, "/danmaku", {
     text: body.text,
     color: body.color,
     size: body.size,
@@ -171,9 +171,11 @@ export async function handleDanmakuPost(request, env, url, cfg) {
     bfp: fp.bfp,
     dfp: fp.dfp,
   });
-  if (!res) return json({ error: "写入失败" }, 500);
-  if (res.error) return json({ error: res.error }, res.error.includes("太快") ? 429 : 400);
-  return json({ ok: true, item: res.item }, 201);
+  if (rec.status !== 200 || !rec.data || rec.data.error) {
+    const code = rec.status === 403 ? 403 : rec.status === 429 ? 429 : 400;
+    return json({ error: (rec.data && rec.data.error) || "写入失败", blocked: code === 403 }, code);
+  }
+  return json({ ok: true, item: rec.data.item }, 201);
 }
 
 /* ------------------------------------------------------------ 传图片 */

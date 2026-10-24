@@ -300,6 +300,36 @@ await it("黑名单：管理接口未登录一律 401", async () => {
   const post = await call("/admin/api/block", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ip: "1.2.3.4" }) }, e);
   assert.equal(post.status, 401);
 });
+
+await it("黑名单：被限制的 IP 发弹幕也返回 403", async () => {
+  const e = {
+    ...env(),
+    VAULT: {
+      idFromName: () => "stub",
+      get: () => ({
+        fetch: async () =>
+          new Response(JSON.stringify({ error: "该网络已被限制发送，如有疑问可联系管理员", blocked: true }), {
+            status: 403,
+            headers: { "content-type": "application/json" },
+          }),
+      }),
+    },
+  };
+  const res = await call(
+    "/api/wall/danmaku",
+    {
+      method: "POST",
+      headers: { "content-type": "application/json", "cf-connecting-ip": "5.6.7.8" },
+      body: JSON.stringify({ text: "hi", color: "#ffffff", size: 15 }),
+    },
+    e,
+  );
+  assert.equal(res.status, 403);
+  const data = await res.json();
+  assert.equal(data.blocked, true);
+  assert.ok(/限制发送/.test(data.error));
+});
+
 /* ------------------------------------------------------------------ 汇总 */
 
 let pass = 0;

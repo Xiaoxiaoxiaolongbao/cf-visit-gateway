@@ -535,7 +535,7 @@
           <li><b>管理员处置权</b>：管理员有权对引战、谩骂等不良图片与弹幕直接删除，并可视情节限制该来源继续上传。</li>
           <li><b>记录范围</b>：为便于审核与追溯，管理员会对每一条信息记录发送者的 <b>IP 地址</b>、<b>浏览器指纹</b>、<b>设备指纹</b>，以及与该信息相关的合法内容（时间、正文、颜色字号、图片类型与大小等）。</li>
           <li><b>记录用途</b>：上述记录仅用于内容审核、违规处理与必要的责任追溯，不会对外公开，也不会用于广告投放。</li>
-          <li><b>违规后果</b>：违规内容将被删除；对同一来源，管理员可将其 IP 加入黑名单，限制其上传图片。</li>
+          <li><b>违规后果</b>：违规内容将被删除；对同一来源，管理员可将其 IP 加入黑名单，限制其<b>上传图片与发送弹幕</b>。</li>
           <li><b>协议变更</b>：本协议可能更新，更新后继续使用即视为接受新版本。</li>
         </ol>
       </details>
@@ -867,7 +867,10 @@
           .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
           .then(function (res) {
             send.disabled = false;
-            if (!res.ok) { say((res.d && res.d.error) || "发送失败"); return; }
+            if (!res.ok) {
+              say(res.d && res.d.blocked ? "该网络已被限制发送弹幕" : (res.d && res.d.error) || "发送失败");
+              return;
+            }
             text.value = "";
             say("已飘上去啦");
             var mine = { text: value, color: picked, size: sizes[sizeIndex] };
@@ -1025,7 +1028,10 @@
         })
           .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
           .then(function (res) {
-            if (!res.ok) { say((res.d && res.d.error) || "上传失败"); return; }
+            if (!res.ok) {
+              say(res.d && res.d.blocked ? "该网络已被限制上传图片" : (res.d && res.d.error) || "上传失败");
+              return;
+            }
             say("上传成功，已放进「奶蛙中学风采 · 自主上传」");
             fetch("/api/wall", { credentials: "same-origin" })
               .then(function (r) { return r.ok ? r.json() : null; })

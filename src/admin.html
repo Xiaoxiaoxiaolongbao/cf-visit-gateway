@@ -409,7 +409,7 @@
         kind: "block",
         id: b.ip,
         title: b.ip,
-        meta: "加入于 " + when(b.created) + (b.reason ? " · " + b.reason : "") + " · 该 IP 无法上传图片",
+        meta: "加入于 " + when(b.created) + (b.reason ? " · " + b.reason : "") + " · 该 IP 无法上传图片与发送弹幕",
       }));
     } else {
       items = state.passkeys.map((k) => ({ kind: "passkey", id: k.id, title: k.name || k.id.slice(0, 12), meta: "注册于 " + when(k.created) }));
@@ -443,7 +443,7 @@
           label: "拉黑",
           className: "",
           onClick: async () => {
-            const ok = window.confirm("确认拉黑该 IP？\n\n" + item.ip + "\n\n拉黑后该 IP 无法上传图片（弹幕不受影响），可在「黑名单」里解除。");
+            const ok = window.confirm("确认拉黑该 IP？\n\n" + item.ip + "\n\n拉黑后该 IP 无法上传图片与发送弹幕，可在「黑名单」里解除。");
             if (!ok) return;
             await api("/block", { method: "POST", body: { ip: item.ip, reason: "手动拉黑" } });
             say("panel-status", "已拉黑 " + item.ip, "ok");
