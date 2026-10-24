@@ -311,8 +311,8 @@ var page_default = `<!DOCTYPE html>
 
   /* 弹幕层：只浮在头像圆框内，不挡点击 */
   .danmaku-layer {
-    position: absolute; left: -22%; right: -22%; top: 12%; height: 62%;
-    z-index: 5; overflow: hidden; pointer-events: none;
+    position: absolute; left: 50%; width: min(94vw, 600px); transform: translateX(-50%);
+    top: 8%; height: 70%; z-index: 5; overflow: hidden; pointer-events: none;
   }
   .danmaku-layer span {
     position: absolute; left: 100%; top: 0; white-space: nowrap; will-change: transform;
@@ -457,7 +457,7 @@ var page_default = `<!DOCTYPE html>
     .corner { top: 12px; right: 14px; gap: 12px; }
     .corner svg { width: 14px; height: 14px; }
     .exhibit { width: min(232px, 60vw, 30vh); }
-    .danmaku-layer { left: -26%; right: -26%; top: 10%; height: 66%; }
+    .danmaku-layer { width: min(96vw, 600px); top: 6%; height: 76%; }
     .plate { margin-top: 18px; padding-bottom: 16px; }
     .headline { margin-top: 26px; }
     .cta-wrap { margin-top: 30px; }
@@ -736,7 +736,7 @@ var page_default = `<!DOCTYPE html>
         var span = document.createElement("span");
         span.textContent = item.text;
         span.style.color = item.color || "#f5f5f7";
-        span.style.fontSize = Math.min(28, Math.max(12, item.size || 15)) + "px";
+        span.style.fontSize = Math.min(24, Math.max(12, item.size || 15)) + "px";
         span.style.top = "0px";
         layer.appendChild(span);
 
@@ -750,7 +750,7 @@ var page_default = `<!DOCTYPE html>
         var dist = layer.clientWidth + span.offsetWidth + 20;
         span.style.setProperty("--dm-from", dist / 2 + "px");
         span.style.setProperty("--dm-to", -(dist) + "px");
-        var dur = Math.max(7, Math.min(16, dist / 55));
+        var dur = Math.max(9, Math.min(22, dist / 46));
         span.style.animationDuration = dur + "s";
         span.addEventListener("animationend", function () { span.remove(); });
       }
