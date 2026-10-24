@@ -343,12 +343,6 @@
   }
   .dropzone:hover, .dropzone.over { border-color: var(--paper); background: var(--hover-fill); }
   .dropzone input { display: none; }
-  .upload-strip { display: flex; gap: 8px; margin-top: 12px; overflow-x: auto; padding-bottom: 2px; }
-  .upload-strip a { flex: none; display: block; }
-  .upload-strip img {
-    width: 66px; height: 66px; object-fit: cover; border-radius: 8px;
-    border: 1px solid var(--hair); display: block;
-  }
   .upload-note { margin: 10px 0 0; font-size: 10.5px; color: var(--ink-soft); letter-spacing: .03em; }
 
   /* 风采入口：细线行，像目录条目 */
@@ -388,13 +382,22 @@
     transition: color .2s ease, border-color .2s ease;
   }
   .lightbox-close:hover { color: var(--paper); border-color: var(--hair-strong); }
-  .lightbox-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .lightbox-group { margin-bottom: 22px; }
+  .lightbox-group:last-of-type { margin-bottom: 0; }
+  .lightbox-sub {
+    display: flex; align-items: center; gap: 10px; margin: 0 0 10px;
+    font-family: var(--mono); font-size: 9.5px; letter-spacing: .2em;
+    text-transform: uppercase; color: var(--ink-soft);
+  }
+  .lightbox-sub::after { content: ""; flex: 1; height: 1px; background: var(--hair); }
+  .lightbox-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .lightbox-empty { margin: 2px 0 0; font-size: 11.5px; color: var(--ink-soft); letter-spacing: .02em; }
   .lightbox-grid img { display: block; width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--hair); }
   .lightbox-foot { margin: 20px 0 0; font-size: 11.5px; letter-spacing: .02em; color: var(--ink-soft); text-align: center; }
   @media (max-width: 520px) {
     .lightbox { padding: 14px; }
     .lightbox-panel { padding: 16px; max-height: 90vh; }
-    .lightbox-grid { grid-template-columns: 1fr; }
+    .lightbox-grid { grid-template-columns: repeat(2, 1fr); gap: 6px; }
   }
 
   /* 矮屏：压缩纵向节奏，保证主按钮始终留在首屏 */
@@ -495,8 +498,7 @@
       <input type="file" id="file-input" accept="image/jpeg,image/png,image/gif,image/webp">
       <span id="drop-text">点击选择，或把图片拖到这里（JPG / PNG / GIF / WebP）</span>
     </label>
-    <div class="upload-strip" id="upload-strip"></div>
-    <p class="upload-note">上传后任何人可见；管理员可在 /admin 删除。</p>
+    <p class="upload-note">上传后会出现在上方「奶蛙中学风采 · 自主上传」里，任何人可见；管理员可在 /admin 删除。</p>
   </section>
 </main>
   <div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-labelledby="lightbox-title" hidden>
@@ -506,13 +508,21 @@
         <h2 id="lightbox-title">奶蛙中学风采</h2>
         <button class="lightbox-close" type="button" id="lightbox-close" aria-label="关闭">&times;</button>
       </div>
-      <div class="lightbox-grid">
-        <img src="/gallery/1.jpg" alt="奶蛙中学风采 1" width="800" height="640" loading="lazy" decoding="async">
-        <img src="/gallery/2.jpg" alt="奶蛙中学风采 2" width="800" height="640" loading="lazy" decoding="async">
-        <img src="/gallery/3.jpg" alt="奶蛙中学风采 3" width="800" height="640" loading="lazy" decoding="async">
-        <img src="/gallery/4.jpg" alt="奶蛙中学风采 4" width="800" height="640" loading="lazy" decoding="async">
-        <img src="/gallery/5.jpg" alt="奶蛙中学风采 5" width="800" height="450" loading="lazy" decoding="async">
-        <img src="/gallery/6.jpg" alt="奶蛙中学风采 6" width="800" height="534" loading="lazy" decoding="async">
+      <div class="lightbox-group">
+        <p class="lightbox-sub">管理员投稿</p>
+        <div class="lightbox-grid" id="grid-curated">
+          <img src="/gallery/1.jpg" alt="奶蛙中学风采 1" width="800" height="640" loading="lazy" decoding="async">
+          <img src="/gallery/2.jpg" alt="奶蛙中学风采 2" width="800" height="640" loading="lazy" decoding="async">
+          <img src="/gallery/3.jpg" alt="奶蛙中学风采 3" width="800" height="640" loading="lazy" decoding="async">
+          <img src="/gallery/4.jpg" alt="奶蛙中学风采 4" width="800" height="640" loading="lazy" decoding="async">
+          <img src="/gallery/5.jpg" alt="奶蛙中学风采 5" width="800" height="450" loading="lazy" decoding="async">
+          <img src="/gallery/6.jpg" alt="奶蛙中学风采 6" width="800" height="534" loading="lazy" decoding="async">
+        </div>
+      </div>
+      <div class="lightbox-group">
+        <p class="lightbox-sub">自主上传</p>
+        <div class="lightbox-grid" id="grid-user"></div>
+        <p class="lightbox-empty" id="grid-user-empty">还没有人上传，你可以是第一个。</p>
       </div>
       <p class="lightbox-foot">想投稿？QQ+2751404400</p>
     </div>
@@ -645,9 +655,12 @@
       var sizeIndex = 1;
       var picked = palette[0];
       var seen = {};
-      var tracks = 0;
       var trackIndex = 0;
       var timer = null;
+      var pool = [];          // 已有弹幕，循环飘
+      var cursor = 0;
+      var ticker = null;
+      var lastNew = 0;
       var reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
       if (!layer) return;
@@ -702,16 +715,32 @@
         span.addEventListener("animationend", function () { span.remove(); });
       }
 
+      // 把已有弹幕放进池子；新到的插到末尾，保证一打开就有东西飘
       function addAll(items) {
-        var fresh = [];
         (items || []).forEach(function (item) {
           if (seen[item.id]) return;
           seen[item.id] = true;
-          fresh.push(item);
+          pool.push(item);
+          lastNew += 1;
         });
-        fresh.slice(-6).forEach(function (item, i) {
-          setTimeout(function () { float(item); }, i * 900);
-        });
+        if (pool.length > 200) pool = pool.slice(-200);
+        startTicker();
+      }
+
+      // 每 2.4 秒从池子里取一条飘出去，循环往复
+      function startTicker() {
+        if (reduced || ticker || !layer || !pool.length) return;
+        ticker = setInterval(function () {
+          if (!pool.length) return;
+          var item = pool[cursor % pool.length];
+          cursor += 1;
+          // 新到的那条也尽快出现
+          if (lastNew > 0 && Math.random() < 0.25) {
+            lastNew = 0;
+            item = pool[pool.length - 1];
+          }
+          float(item);
+        }, 2400);
       }
 
       function load() {
@@ -726,22 +755,26 @@
           .catch(function () {});
       }
 
+      // 自主上传的图片渲染进风采弹窗；点开原图
       function renderUploads(items) {
-        var strip = byId("upload-strip");
-        if (!strip) return;
-        strip.innerHTML = "";
-        items.slice(0, 12).forEach(function (u) {
+        var grid = byId("grid-user");
+        var empty = byId("grid-user-empty");
+        if (!grid) return;
+        grid.innerHTML = "";
+        (items || []).slice(0, 60).forEach(function (u) {
           var a = document.createElement("a");
           a.href = "/img/" + u.id;
           a.target = "_blank";
           a.rel = "noopener noreferrer";
           var img = document.createElement("img");
           img.src = "/img/" + u.id;
-          img.alt = u.title || "上传的图片";
+          img.alt = u.title || "自主上传的图片";
           img.loading = "lazy";
+          img.decoding = "async";
           a.appendChild(img);
-          strip.appendChild(a);
+          grid.appendChild(a);
         });
+        if (empty) empty.hidden = (items || []).length > 0;
       }
 
       function post() {
@@ -760,8 +793,13 @@
             if (!res.ok) { say((res.d && res.d.error) || "发送失败"); return; }
             text.value = "";
             say("已飘上去啦");
-            float({ text: value, color: picked, size: sizes[sizeIndex] });
-            if (res.d && res.d.item) seen[res.d.item.id] = true;
+            var mine = { text: value, color: picked, size: sizes[sizeIndex] };
+            float(mine);
+            if (res.d && res.d.item) {
+              seen[res.d.item.id] = true;
+              pool.push(res.d.item);
+              lastNew += 1;
+            }
           })
           .catch(function () { send.disabled = false; say("网络出错，稍后再试"); });
       }
@@ -785,8 +823,17 @@
           .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
           .then(function (res) {
             if (!res.ok) { say((res.d && res.d.error) || "上传失败"); return; }
-            say("上传成功，正在刷新列表");
-            load();
+            say("上传成功，已放进「奶蛙中学风采 · 自主上传」");
+            fetch("/api/wall", { credentials: "same-origin" })
+              .then(function (r) { return r.ok ? r.json() : null; })
+              .then(function (data) {
+                if (!data) return;
+                renderUploads(data.uploads || []);
+                addAll(data.danmaku || []);
+                var trigger = byId("gallery-open");
+                if (trigger) trigger.click();
+              })
+              .catch(function () {});
           })
           .catch(function () { say("上传出错，稍后再试"); });
       }
