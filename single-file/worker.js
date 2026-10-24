@@ -736,20 +736,27 @@ var page_default = `<!DOCTYPE html>
         var span = document.createElement("span");
         span.textContent = item.text;
         span.style.color = item.color || "#f5f5f7";
-        span.style.fontSize = Math.min(24, Math.max(12, item.size || 15)) + "px";
+        // 长句按长度收字号，尽量在带宽内整句滑完（60 字上限时收到 13px）
+        var fs = Math.min(24, Math.max(12, item.size || 15));
+        var len = String(item.text || "").length;
+        if (len > 14) fs = Math.min(fs, 18);
+        if (len > 24) fs = Math.min(fs, 15);
+        if (len > 40) fs = Math.min(fs, 13);
+        span.style.fontSize = fs + "px";
         span.style.top = "0px";
         layer.appendChild(span);
 
-        // 轨道：先尝试空闲轨，满了就随机
-        var rows = Math.max(3, Math.floor(layer.clientHeight / 30));
+        // 轨道：按字号均分带宽内的高度，保证整条都落在带子里
+        var lineH = fs + 10;
+        var bandH = layer.clientHeight || 120;
+        var rows = Math.max(2, Math.floor(bandH / lineH));
         var row = trackIndex % rows;
         trackIndex += 1;
-        var y = 6 + row * 28;
-        span.style.top = y + "px";
+        var y = Math.min(Math.max(2, bandH - fs - 2), 4 + row * lineH);
+        span.style.top = Math.round(y) + "px";
 
-        var dist = layer.clientWidth + span.offsetWidth + 20;
-        span.style.setProperty("--dm-from", dist / 2 + "px");
-        span.style.setProperty("--dm-to", -(dist) + "px");
+        var dist = layer.clientWidth + span.offsetWidth + 12;
+        span.style.setProperty("--dm-to", -dist + "px");
         var dur = Math.max(9, Math.min(22, dist / 46));
         span.style.animationDuration = dur + "s";
         span.addEventListener("animationend", function () { span.remove(); });
