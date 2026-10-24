@@ -126,6 +126,13 @@ function hasAdminToken(request, cfg) {
   return Boolean(cfg && cfg.adminToken && token && token === cfg.adminToken);
 }
 
+/** 令牌只在「一条 passkey 都没有」时可用；绑定过之后它就不再是入口 */
+async function tokenUsable(env, request, cfg) {
+  if (!hasAdminToken(request, cfg)) return false;
+  const list = (await vaultCall(env, "/passkeys")) || { items: [] };
+  return (list.items || []).length === 0;
+}
+
 /* ------------------------------------------------------------ 公开读 */
 
 export async function handleWallGet(env) {
@@ -275,7 +282,11 @@ export async function handleAdminApi(request, env, url, cfg) {
     const body = await request.json().catch(() => ({}));
     const mode = body.mode === "register" ? "register" : "login";
 
-    if (mode === "register" && !authed && !tokenOk) return json({ error: "需要先通过令牌验证" }, 403);
+    if (mode === "register" && !authed) {
+      if (!(await tokenUsable(env, request, cfg))) {
+        return json({ error: "已存在 passkey：绑定新设备请先用这台电脑的 passkey 登录，令牌通道已关闭" }, 403);
+      }
+    }
 
     const challenge = b64uEncode(crypto.getRandomValues(new Uint8Array(32)));
     const cookieVal = await sign(cfg.apiSecret, { c: challenge, exp: Date.now() + CHALLENGE_TTL, mode });
@@ -327,7 +338,9 @@ export async function handleAdminApi(request, env, url, cfg) {
 
   /* --- 注册：校验并落库 --- */
   if (path === "/passkey/register" && request.method === "POST") {
-    if (!authed && !tokenOk) return json({ error: "需要先通过令牌验证" }, 403);
+    if (!authed && !(await tokenUsable(env, request, cfg))) {
+      return json({ error: "已存在 passkey：请先用 passkey 登录后再绑定新设备" }, 403);
+    }
     const body = await request.json().catch(() => ({}));
     const chal = await unsign(cfg.apiSecret, cookie(request, "vw-chal"));
     if (!chal || chal.mode !== "register") return json({ error: "挑战已失效，请重试" }, 400);
@@ -389,12 +402,16 @@ export async function handleAdminApi(request, env, url, cfg) {
     const body = await request.json().catch(() => ({}));
     const token = String(body.token || "");
     if (!cfg.adminToken || token !== cfg.adminToken) return json({ error: "令牌不正确" }, 403);
+    const existing = (await vaultCall(env, "/passkeys")) || { items: [] };
+    if ((existing.items || []).length > 0) {
+      return json({ error: "已有 passkey，令牌通道已关闭；请直接用 passkey 登录" }, 403);
+    }
     const sess = await sign(cfg.apiSecret, { role: "admin", exp: Date.now() + BOOTSTRAP_TTL });
     return json({ ok: true, ttl: BOOTSTRAP_TTL }, 200, { "set-cookie": setCookie("vw-sess", sess, BOOTSTRAP_TTL) });
   }
 
-  /* --- 以下要求已登录（passkey 会话，或管理令牌） --- */
-  if (!authed && !tokenOk) return json({ error: "未登录" }, 401);
+  /* --- 以下要求已登录：passkey 会话（令牌仅在无 passkey 时可用） --- */
+  if (!authed && !(await tokenUsable(env, request, cfg))) return json({ error: "未登录" }, 401);
 
   if (path === "/logout" && request.method === "POST") {
     return json({ ok: true }, 200, { "set-cookie": setCookie("vw-sess", "", 1) });

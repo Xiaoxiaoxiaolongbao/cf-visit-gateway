@@ -214,19 +214,22 @@
 
     $("bind-card").classList.toggle("hide", state.authed && hasKey);
 
+    // 有 passkey 之后，令牌这一步整体隐藏（不是置灰）
+    $("step1").classList.toggle("hide", hasKey);
+
     // 单一出口：现在该做什么，只有这里算
     const next = $("next-action");
     if (state.authed && hasKey) {
-      next.textContent = "全部完成：这台电脑已可用 passkey 一键登录。";
+      next.textContent = "已登录。要给另一台设备绑定，点「再添加一个 passkey」。";
       next.className = "next done";
     } else if (!state.authed && hasKey) {
-      next.textContent = "这台电脑已经绑定过 passkey —— 现在该做：点下面的「用已有的 passkey 登录」。";
+      next.textContent = "这台电脑已有 passkey —— 点「用这台电脑的 passkey 登录」，确认一次即可进入。";
       next.className = "next act";
     } else if (!state.authed && !hasKey) {
-      next.textContent = "现在该做第 1 步：把管理令牌粘进下面输入框，点「验证令牌」。验证通过后会自动接着弹 Windows Hello。";
+      next.textContent = "首次使用（系统里还没有任何 passkey）：粘一次性令牌完成引导，之后令牌自动失效。";
       next.className = "next act";
     } else {
-      next.textContent = "令牌已通过，现在该做第 2 步：点「添加这台电脑的 passkey」，在系统窗口里确认一次。";
+      next.textContent = "令牌已通过：点「添加这台电脑的 passkey」，在系统窗口里确认一次。";
       next.className = "next act";
     }
 
@@ -256,7 +259,7 @@
 
     $("step3").classList.toggle("done", hasKey);
     $("step3-hint").textContent = hasKey
-      ? "完成。以后打开这个页面点「用已有的 passkey 登录」即可，不再需要令牌。"
+      ? "完成。以后打开这个页面点一下就能进；令牌步骤已从本页移除。"
       : "绑好后，以后打开这个页面点一下就能进。";
 
     $("manage").classList.toggle("hide", !state.authed);
