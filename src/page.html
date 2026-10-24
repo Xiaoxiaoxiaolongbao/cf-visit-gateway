@@ -680,9 +680,9 @@
       var cursor = 0;
       var ticker = null;
       var lastNew = 0;
-      var MOTION_KEY = "vg-dm";
+      var MOTION_KEY = "vg-dm2";
       var motionPref = (function () {
-        try { return localStorage.getItem(MOTION_KEY) || "auto"; } catch (e) { return "auto"; }
+        try { return localStorage.getItem(MOTION_KEY) || "on"; } catch (e) { return "on"; }
       })();
       var sysReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       var reduced = motionPref === "off" || (motionPref === "auto" && sysReduced);
@@ -860,7 +860,7 @@
       var motionBtn = byId("dm-motion");
       function paintMotion() {
         if (!motionBtn) return;
-        motionBtn.textContent = "动效 " + (motionPref === "auto" ? "自动" : motionPref === "on" ? "开" : "关");
+        motionBtn.textContent = "动效 " + (motionPref === "on" ? "开" : motionPref === "off" ? "关" : "自动");
         motionBtn.setAttribute("aria-pressed", String(motionPref === "on"));
       }
       function restart() {
@@ -875,11 +875,11 @@
       }
       if (motionBtn) {
         motionBtn.addEventListener("click", function () {
-          motionPref = motionPref === "auto" ? "on" : motionPref === "on" ? "off" : "auto";
+          motionPref = motionPref === "on" ? "off" : motionPref === "off" ? "auto" : "on";
           try { localStorage.setItem(MOTION_KEY, motionPref); } catch (e) {}
           paintMotion();
           restart();
-          say(motionPref === "off" ? "已关闭飘动弹幕（静态显示）" : motionPref === "on" ? "已强制开启飘动弹幕" : "动效跟随系统");
+          say(motionPref === "on" ? "飘动弹幕已开启" : motionPref === "off" ? "已关闭飘动弹幕（静态显示）" : "动效跟随系统设置");
         });
         paintMotion();
       }
