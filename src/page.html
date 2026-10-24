@@ -380,6 +380,47 @@
   .gallery-chev { flex: none; width: 14px; height: 14px; color: var(--ink-soft); transition: color .25s ease; }
   .gallery-entry:hover .gallery-chev { color: var(--paper); }
 
+  /* 站长私信：与上传卡同一套骨架 */
+  .msg-card {
+    margin: 18px 0 0; padding: 18px; border: 1px solid var(--hair); border-radius: 12px;
+    animation: reveal 1s .56s var(--ease) both;
+  }
+  .msg-card .upload-head { margin-bottom: 12px; }
+  .msg-field {
+    display: block; width: 100%; margin-bottom: 8px; padding: 10px 12px;
+    border: 1px solid var(--hair); border-radius: 9px; background: rgba(255, 255, 255, .02);
+    color: var(--paper); font: inherit; font-size: 13px; letter-spacing: .01em; resize: vertical;
+  }
+  .msg-field::placeholder { color: var(--ink-soft); }
+  .msg-field:focus { outline: 2px solid var(--hair-strong); outline-offset: 1px; }
+  textarea.msg-field { min-height: 84px; }
+  .msg-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .msg-row .msg-field { flex: 1; min-width: 160px; margin-bottom: 0; }
+  .msg-send {
+    flex: none; padding: 9px 20px; border-radius: 980px; border: 0; cursor: pointer;
+    background: var(--btn-bg); color: var(--btn-fg); font-size: 13px; font-weight: 500;
+    transition: background-color .2s ease, opacity .2s ease;
+  }
+  .msg-send:hover { background: var(--btn-bg-hover); }
+  .msg-send:disabled { opacity: .5; cursor: default; }
+  .msg-note { margin: 10px 0 0; font-size: 10.5px; color: var(--ink-soft); letter-spacing: .03em; }
+  .msg-lookup { display: flex; gap: 8px; align-items: center; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--hair); }
+  .msg-lookup .msg-field { margin-bottom: 0; }
+  .msg-lookup button {
+    flex: none; padding: 8px 16px; border-radius: 980px; cursor: pointer;
+    border: 1px solid var(--hair-strong); background: transparent; color: var(--paper); font-size: 12.5px;
+  }
+  .msg-lookup button:hover { background: var(--hover-fill); }
+  .msg-code {
+    margin: 10px 0 0; font-family: var(--mono); font-size: 12px; letter-spacing: .1em; color: var(--paper);
+  }
+  .msg-code b { color: var(--ok, #7ad0a0); font-weight: 500; }
+  .msg-reply {
+    margin: 10px 0 0; padding: 12px 14px; border: 1px solid var(--hair); border-radius: 10px;
+    background: var(--hover-fill); font-size: 12.5px; line-height: 1.8; color: var(--paper); white-space: pre-wrap;
+  }
+  .msg-reply span { display: block; margin-bottom: 6px; font-family: var(--mono); font-size: 9.5px; letter-spacing: .18em; text-transform: uppercase; color: var(--ink-soft); }
+
   /* 上传确认窗：与风采弹窗同一套语言（同一面板底色/描边/圆角/入场动画） */
   .confirm { position: fixed; inset: 0; z-index: 30; display: flex; align-items: center; justify-content: center; padding: 22px; }
   .confirm[hidden] { display: none; }
@@ -567,6 +608,25 @@
     </label>
     <p class="upload-note">上传后会出现在上方「奶蛙中学风采 · 自主上传」里，任何人可见；管理员可在 /admin 删除。</p>
   </section>
+
+  <section class="msg-card">
+    <div class="upload-head"><b>给站长留言</b><span>Private</span></div>
+    <div class="msg-row">
+      <input class="msg-field" id="msg-name" maxlength="20" placeholder="怎么称呼你（可留空）" autocomplete="off">
+      <input class="msg-field" id="msg-contact" maxlength="60" placeholder="QQ / 邮箱（可留空）" autocomplete="off">
+    </div>
+    <textarea class="msg-field" id="msg-body" maxlength="500" placeholder="想说的话、建议或问题（500 字以内）"></textarea>
+    <div class="msg-row">
+      <button class="msg-send" id="msg-send" type="button">发送给站长</button>
+    </div>
+    <p class="msg-code" id="msg-code" hidden></p>
+    <p class="msg-note" id="msg-note">内容只有站长能看到。发送后会给你一个查询码，用它回到这里查看回复。</p>
+    <div class="msg-lookup">
+      <input class="msg-field" id="msg-query" maxlength="10" placeholder="查询码（10 位）" autocomplete="off">
+      <button id="msg-check" type="button">查询回复</button>
+    </div>
+    <div id="msg-reply"></div>
+  </section>
 </main>
 
   <div class="confirm" id="up-confirm" role="dialog" aria-modal="true" aria-labelledby="up-confirm-title" hidden>
@@ -734,6 +794,80 @@
     }
 
     boot();
+
+    /* ---------------------------------------------------- 站长私信 */
+    (function initMailbox() {
+      var nameEl = byId("msg-name");
+      var contactEl = byId("msg-contact");
+      var bodyEl = byId("msg-body");
+      var sendBtn = byId("msg-send");
+      var noteEl = byId("msg-note");
+      var codeEl = byId("msg-code");
+      var queryEl = byId("msg-query");
+      var checkBtn = byId("msg-check");
+      var replyEl = byId("msg-reply");
+      if (!sendBtn || !bodyEl) return;
+
+      function note(text) { if (noteEl) noteEl.textContent = text; }
+
+      sendBtn.addEventListener("click", function () {
+        var text = (bodyEl.value || "").trim();
+        if (!text) { note("先写点内容再发送"); return; }
+        if (text.length > 500) { note("超过 500 字了"); return; }
+        sendBtn.disabled = true;
+        note("正在发送…");
+        fetch("/api/wall/message", {
+          method: "POST",
+          headers: { "content-type": "application/json", "x-bfp": "", "x-dfp": "" },
+          credentials: "same-origin",
+          body: JSON.stringify({
+            name: nameEl ? nameEl.value : "",
+            contact: contactEl ? contactEl.value : "",
+            body: text,
+          }),
+        })
+          .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+          .then(function (res) {
+            sendBtn.disabled = false;
+            if (!res.ok) { note((res.d && res.d.error) || "发送失败，稍后再试"); return; }
+            bodyEl.value = "";
+            if (codeEl && res.d && res.d.code) {
+              codeEl.hidden = false;
+              codeEl.innerHTML = "";
+              codeEl.appendChild(document.createTextNode("查询码 "));
+              var b = document.createElement("b");
+              b.textContent = res.d.code;
+              codeEl.appendChild(b);
+              codeEl.appendChild(document.createTextNode("（记下来，回来看回复要用）"));
+            }
+            note("已送到站长那里，谢谢！");
+          })
+          .catch(function () { sendBtn.disabled = false; note("网络出错，稍后再试"); });
+      });
+
+      if (checkBtn && queryEl && replyEl) {
+        checkBtn.addEventListener("click", function () {
+          var code = (queryEl.value || "").trim().toLowerCase();
+          if (!/^[a-f0-9]{10}$/.test(code)) { replyEl.innerHTML = ""; note("查询码是 10 位十六进制字符"); return; }
+          replyEl.innerHTML = "";
+          fetch("/api/wall/message?code=" + encodeURIComponent(code), { credentials: "same-origin" })
+            .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+            .then(function (res) {
+              if (!res.ok || !res.d.item) { note((res.d && res.d.error) || "没有找到这条留言"); return; }
+              var item = res.d.item;
+              var box = document.createElement("div");
+              box.className = "msg-reply";
+              var label = document.createElement("span");
+              label.textContent = item.replied ? "站长回复" : "还在等回复";
+              box.appendChild(label);
+              box.appendChild(document.createTextNode(item.replied ? item.reply : "站长还没回复这条留言，可以过几天再来看看。"));
+              replyEl.appendChild(box);
+              note("查询成功");
+            })
+            .catch(function () { note("查询失败，稍后再试"); });
+        });
+      }
+    })();
 
     /* ---------------------------------------------------- 弹幕 + 上传 */
     (function initWall() {

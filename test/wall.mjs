@@ -330,6 +330,69 @@ await it("黑名单：被限制的 IP 发弹幕也返回 403", async () => {
   assert.ok(/限制发送/.test(data.error));
 });
 
+await it("站长私信：公开投递返回查询码，按码可取回回复", async () => {
+  let stored = null;
+  const e = env({
+    VAULT: vaultStub((path, body) => {
+      if (path === "/message") {
+        stored = { code: "abc1234567", body: body.body, reply: "", replied: 0 };
+        return { ok: true, id: "m1", code: "abc1234567" };
+      }
+      if (path === "/message") return { item: null };
+      return { items: [] };
+    }),
+  });
+
+  // 改写 stub：GET /message 走查询码分支
+  e.VAULT = {
+    idFromName: () => "stub",
+    get: () => ({
+      fetch: async (url, init) => {
+        const u = new URL(url);
+        const path = u.pathname;
+        const body = init && init.body ? JSON.parse(init.body) : {};
+        let out;
+        if (path === "/message" && init && init.method === "POST") {
+          out = { ok: true, id: "m1", code: "abc1234567" };
+        } else if (path === "/message" && u.searchParams.get("code") === "abc1234567") {
+          out = { item: { body: "希望加个夜间模式", reply: "收到，已排期", replied: 1, created: 1 } };
+        } else {
+          out = { error: "not found" };
+        }
+        return new Response(JSON.stringify(out), { status: 200, headers: { "content-type": "application/json" } });
+      },
+    }),
+  };
+
+  const post = await call(
+    "/api/wall/message",
+    { method: "POST", headers: { "content-type": "application/json", "cf-connecting-ip": "7.7.7.7" }, body: JSON.stringify({ name: "小王", body: "希望加个夜间模式" }) },
+    e,
+  );
+  assert.equal(post.status, 201);
+  const created = await post.json();
+  assert.match(created.code, /^[a-f0-9]{10}$/);
+
+  const got = await call(`/api/wall/message?code=${created.code}`, {}, e);
+  assert.equal(got.status, 200);
+  const item = (await got.json()).item;
+  assert.equal(item.replied, 1);
+  assert.ok(item.reply.length > 0);
+
+  const bad = await call("/api/wall/message?code=nope", {}, e);
+  assert.equal(bad.status, 400, "查询码格式不对应 400");
+});
+
+await it("站长私信：管理接口未登录 401", async () => {
+  const e = env({ VAULT: vaultStub(() => ({ items: [] })) });
+  assert.equal((await call("/admin/api/messages", {}, e)).status, 401);
+  const r = await call(
+    "/admin/api/message/reply",
+    { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: "m1", reply: "ok" }) },
+    e,
+  );
+  assert.equal(r.status, 401);
+});
 /* ------------------------------------------------------------------ 汇总 */
 
 let pass = 0;

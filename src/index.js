@@ -27,6 +27,8 @@ import {
   handleImageGet,
   handleAdminPage,
   handleAdminApi,
+  handleMessagePost,
+  handleMessageLookup,
 } from "./wall.js";
 import NAIWA_BYTES from "../assets/naiwa.jpg";
 import GALLERY_1 from "../assets/gallery/1.jpg";
@@ -93,6 +95,8 @@ async function route(request, env, ctx) {
   if (url.pathname === "/api/wall") return handleWallGet(env);
   if (url.pathname === "/api/wall/danmaku" && request.method === "POST") return handleDanmakuPost(request, env, url, cfg);
   if (url.pathname === "/api/wall/upload" && request.method === "POST") return handleUploadPost(request, env, url, cfg);
+  if (url.pathname === "/api/wall/message" && request.method === "POST") return handleMessagePost(request, env, url, cfg);
+  if (url.pathname === "/api/wall/message" && request.method === "GET") return handleMessageLookup(env, url);
   {
     const img = /^\/img\/([a-z0-9]{16,32})$/.exec(url.pathname);
     if (img) return handleImageGet(env, url, img[1]);

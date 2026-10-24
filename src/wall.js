@@ -233,6 +233,46 @@ export async function handleUploadPost(request, env, url, cfg) {
   return json({ ok: true, item: { id, mime: kind.mime, bytes: buf.length, title } }, 201);
 }
 
+/* ------------------------------------------------------- 站长私信 */
+
+const MESSAGE_LIMIT = 500;
+
+export async function handleMessagePost(request, env, url, cfg) {
+  if (!vault(env)) return json({ error: "留言未启用" }, 503);
+  if (Number(request.headers.get("content-length") || 0) > 8192) return json({ error: "内容太长" }, 413);
+
+  const body = await request.json().catch(() => null);
+  if (!body) return json({ error: "格式错误" }, 400);
+  if (String(body.body || "").trim().length > MESSAGE_LIMIT) return json({ error: `超过 ${MESSAGE_LIMIT} 字` }, 400);
+
+  const ip = request.headers.get("cf-connecting-ip") || "0.0.0.0";
+  const iphash = await sha256Hex(`${ip}|${cfg.apiSecret || ""}`);
+  const fp = fingerprintsOf(request);
+
+  const rec = await vaultRaw(env, "/message", {
+    name: body.name,
+    contact: body.contact,
+    body: body.body,
+    ip,
+    iphash,
+    bfp: fp.bfp,
+    dfp: fp.dfp,
+  });
+  if (rec.status !== 200 || !rec.data || rec.data.error) {
+    const code = rec.status === 403 ? 403 : rec.status === 429 ? 429 : 400;
+    return json({ error: (rec.data && rec.data.error) || "提交失败", blocked: code === 403 }, code);
+  }
+  return json({ ok: true, code: rec.data.code }, 201);
+}
+
+export async function handleMessageLookup(env, url) {
+  const code = String(url.searchParams.get("code") || "").trim();
+  if (!/^[a-f0-9]{10}$/i.test(code)) return json({ error: "查询码格式不对" }, 400);
+  const got = await vaultCall(env, `/message?code=${encodeURIComponent(code)}`);
+  if (!got || !got.item) return json({ error: "没有找到这条留言" }, 404);
+  return json({ item: got.item });
+}
+
 /* ------------------------------------------------------------ 取图片 */
 
 export async function handleImageGet(env, url, id) {
@@ -450,12 +490,29 @@ export async function handleAdminApi(request, env, url, cfg) {
       await vaultPost(env, "/danmaku/remove", { id });
       return json({ ok: true });
     }
+    if (body.kind === "message") {
+      await vaultPost(env, "/messages/remove", { id });
+      return json({ ok: true });
+    }
     if (body.kind === "upload") {
       await vaultPost(env, "/uploads/remove", { id });
       if (env.UPLOADS) await env.UPLOADS.delete(`img:${id}`);
       return json({ ok: true });
     }
     return json({ error: "kind 非法" }, 400);
+  }
+
+  if (path === "/messages" && request.method === "GET") {
+    const list = (await vaultCall(env, "/messages?limit=200")) || { items: [] };
+    return json({ items: list.items || [] });
+  }
+
+  if (path === "/message/reply" && request.method === "POST") {
+    const body = await request.json().catch(() => ({}));
+    const id = String(body.id || "");
+    if (!id) return json({ error: "缺少 id" }, 400);
+    await vaultPost(env, "/messages/reply", { id, reply: String(body.reply || "").slice(0, MESSAGE_LIMIT) });
+    return json({ ok: true });
   }
 
   if (path === "/blocks" && request.method === "GET") {
