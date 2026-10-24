@@ -294,6 +294,14 @@
     from { transform: translateX(0) }
     to { transform: translateX(var(--dm-to, -600px)) }
   }
+  /* 手动开启动效时，把动画时长从 reduced 覆盖里抢回来 */
+  @media (prefers-reduced-motion: reduce) {
+    html[data-dm="on"] .danmaku-layer span {
+      animation-duration: var(--dm-dur, 12s) !important;
+    }
+  }
+  html[data-dm="off"] .danmaku-layer span { animation-duration: .001ms !important; }
+
   /* 减少动效：不飞，静态列在带上，内容不能因为设置而消失 */
   .danmaku-layer.static {
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
@@ -477,6 +485,7 @@
     <input type="text" id="dm-text" maxlength="60" placeholder="在奶蛙头上留一句…" autocomplete="off" aria-label="弹幕内容">
     <div class="dm-colors" id="dm-colors" role="group" aria-label="颜色"></div>
     <button class="dm-size" id="dm-size" type="button" aria-label="字号">15px</button>
+    <button class="dm-size" id="dm-motion" type="button" aria-label="动效">动效 自动</button>
     <button class="dm-send" id="dm-send" type="button">发送</button>
   </div>
   <p class="dm-note" id="dm-note">弹幕会飘过奶蛙头像；同一来源 1 分钟内最多 3 条</p>
@@ -671,7 +680,13 @@
       var cursor = 0;
       var ticker = null;
       var lastNew = 0;
-      var reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      var MOTION_KEY = "vg-dm";
+      var motionPref = (function () {
+        try { return localStorage.getItem(MOTION_KEY) || "auto"; } catch (e) { return "auto"; }
+      })();
+      var sysReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      var reduced = motionPref === "off" || (motionPref === "auto" && sysReduced);
+      document.documentElement.setAttribute("data-dm", motionPref);
 
       if (!layer) return;
 
@@ -728,6 +743,7 @@
         var dist = layer.clientWidth + span.offsetWidth + 12;
         span.style.setProperty("--dm-to", -dist + "px");
         var dur = Math.max(9, Math.min(22, dist / 46));
+        span.style.setProperty("--dm-dur", dur + "s");
         span.style.animationDuration = dur + "s";
         span.addEventListener("animationend", function () { span.remove(); });
       }
@@ -838,6 +854,34 @@
             }
           })
           .catch(function () { send.disabled = false; say("网络出错，稍后再试"); });
+      }
+
+      // 动效开关：自动 → 开 → 关
+      var motionBtn = byId("dm-motion");
+      function paintMotion() {
+        if (!motionBtn) return;
+        motionBtn.textContent = "动效 " + (motionPref === "auto" ? "自动" : motionPref === "on" ? "开" : "关");
+        motionBtn.setAttribute("aria-pressed", String(motionPref === "on"));
+      }
+      function restart() {
+        if (ticker) { clearInterval(ticker); ticker = null; }
+        if (layer) {
+          layer.innerHTML = "";
+          layer.classList.remove("static");
+        }
+        reduced = motionPref === "off" || (motionPref === "auto" && sysReduced);
+        document.documentElement.setAttribute("data-dm", motionPref);
+        if (reduced) renderStatic(); else startTicker();
+      }
+      if (motionBtn) {
+        motionBtn.addEventListener("click", function () {
+          motionPref = motionPref === "auto" ? "on" : motionPref === "on" ? "off" : "auto";
+          try { localStorage.setItem(MOTION_KEY, motionPref); } catch (e) {}
+          paintMotion();
+          restart();
+          say(motionPref === "off" ? "已关闭飘动弹幕（静态显示）" : motionPref === "on" ? "已强制开启飘动弹幕" : "动效跟随系统");
+        });
+        paintMotion();
       }
 
       if (send) send.addEventListener("click", post);
