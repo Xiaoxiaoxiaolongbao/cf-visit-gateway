@@ -281,18 +281,26 @@
 
   /* 弹幕层：只浮在头像圆框内，不挡点击 */
   .danmaku-layer {
-    position: absolute; inset: 0; z-index: 4; overflow: hidden; border-radius: 50%;
-    pointer-events: none;
+    position: absolute; left: -22%; right: -22%; top: 12%; height: 62%;
+    z-index: 5; overflow: hidden; pointer-events: none;
   }
   .danmaku-layer span {
-    position: absolute; left: 0; top: 0; white-space: nowrap; will-change: transform;
+    position: absolute; left: 100%; top: 0; white-space: nowrap; will-change: transform;
     font-weight: 500; letter-spacing: .01em;
     animation-name: dmFloat; animation-timing-function: linear; animation-fill-mode: forwards;
-    text-shadow: 0 1px 4px rgba(0, 0, 0, .6), 0 0 1px rgba(0, 0, 0, .8);
+    text-shadow: 0 1px 4px rgba(0, 0, 0, .62), 0 0 1px rgba(0, 0, 0, .85);
   }
   @keyframes dmFloat {
-    from { transform: translateX(var(--dm-from, 0)) }
-    to { transform: translateX(var(--dm-to, -800px)) }
+    from { transform: translateX(0) }
+    to { transform: translateX(var(--dm-to, -600px)) }
+  }
+  /* 减少动效：不飞，静态列在带上，内容不能因为设置而消失 */
+  .danmaku-layer.static {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  }
+  .danmaku-layer.static span {
+    position: static; left: auto; animation: none !important; opacity: .92;
+    text-align: center; max-width: 100%; overflow: hidden; text-overflow: ellipsis;
   }
 
   /* 发送器：细线一行，克制 */
@@ -419,6 +427,7 @@
     .corner { top: 12px; right: 14px; gap: 12px; }
     .corner svg { width: 14px; height: 14px; }
     .exhibit { width: min(232px, 60vw, 30vh); }
+    .danmaku-layer { left: -26%; right: -26%; top: 10%; height: 66%; }
     .plate { margin-top: 18px; padding-bottom: 16px; }
     .headline { margin-top: 26px; }
     .cta-wrap { margin-top: 30px; }
@@ -451,10 +460,12 @@
   <div class="exhibit">
     <div class="frame">
       <img class="naiwa-img" src="/naiwa.jpg" alt="奶蛙" width="512" height="512" decoding="async" fetchpriority="high">
-      <div class="danmaku-layer" id="dm-layer" aria-hidden="true"></div>
       
     </div>
   </div>
+
+  <!-- 弹幕带：浮在头像上方，矩形不裁切（放在相框外，否则会被圆裁掉） -->
+  <div class="danmaku-layer" id="dm-layer" aria-hidden="true"></div>
 
   <!-- 展签：本页唯一的玩笑装置，写成博物馆标签的格式 -->
   <p class="plate">
@@ -717,19 +728,38 @@
 
       // 把已有弹幕放进池子；新到的插到末尾，保证一打开就有东西飘
       function addAll(items) {
+        var fresh = 0;
         (items || []).forEach(function (item) {
           if (seen[item.id]) return;
           seen[item.id] = true;
           pool.push(item);
-          lastNew += 1;
+          fresh += 1;
         });
         if (pool.length > 200) pool = pool.slice(-200);
+        if (reduced) { renderStatic(); return; }
         startTicker();
+        // 打开页面就先飘一条，不用等 2.4 秒
+        if (fresh && layer) float(pool[pool.length - fresh]);
+      }
+
+      // 减少动效：不飞，把最近几条静态排在带上（内容不能消失）
+      function renderStatic() {
+        if (!layer) return;
+        layer.classList.add("static");
+        layer.innerHTML = "";
+        pool.slice(-3).forEach(function (item) {
+          var span = document.createElement("span");
+          span.textContent = item.text;
+          span.style.color = item.color || "#f5f5f7";
+          span.style.fontSize = Math.min(20, Math.max(12, item.size || 15)) + "px";
+          layer.appendChild(span);
+        });
       }
 
       // 每 2.4 秒从池子里取一条飘出去，循环往复
       function startTicker() {
-        if (reduced || ticker || !layer || !pool.length) return;
+        if (reduced) { renderStatic(); return; }
+        if (ticker || !layer || !pool.length) return;
         ticker = setInterval(function () {
           if (!pool.length) return;
           var item = pool[cursor % pool.length];
