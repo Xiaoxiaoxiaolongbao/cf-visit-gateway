@@ -154,9 +154,15 @@ export class Vault {
     const color = /^#[0-9a-f]{6}$/i.test(String(body.color || "")) ? String(body.color).toLowerCase() : "#f5f5f7";
     const size = Math.min(28, Math.max(12, Number(body.size) || 15));
     const iphash = clean(body.iphash, 64);
+    const ip = clean(body.ip, 45);
     const now = Date.now();
 
     if (!text) return json({ error: "内容为空" }, 400);
+
+    // 黑名单同样拦弹幕（按最新要求：图片与弹幕都受限）
+    if (ip && this.sql.exec("SELECT 1 AS hit FROM blocks WHERE ip = ?", ip).toArray().length) {
+      return json({ error: "该网络已被限制发送，如有疑问可联系管理员", blocked: true }, 403);
+    }
 
     const recent = this.sql
       .exec("SELECT COUNT(*) AS n FROM danmaku WHERE iphash = ? AND created > ?", iphash, now - 60000)
@@ -173,7 +179,7 @@ export class Vault {
       size,
       now,
       iphash,
-      clean(body.ip, 45),
+      ip,
       clean(body.bfp, 32),
       clean(body.dfp, 32),
     );
