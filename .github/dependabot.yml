@@ -1,6 +1,6 @@
 version: 2
 
-# 依赖更新：带 automerge 标签，由 .github/workflows/auto-merge.yml 自动合并
+# 依赖更新：每周一提 PR（不会自动合并，需人工 review 后手动 squash）
 updates:
   - package-ecosystem: npm
     directory: "/"
@@ -10,8 +10,6 @@ updates:
       time: "09:00"
       timezone: Asia/Shanghai
     open-pull-requests-limit: 3
-    labels:
-      - automerge
     commit-message:
       prefix: deps
     groups:
@@ -33,7 +31,5 @@ updates:
       day: monday
       time: "09:00"
       timezone: Asia/Shanghai
-    labels:
-      - automerge
     commit-message:
       prefix: ci
