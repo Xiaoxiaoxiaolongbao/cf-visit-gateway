@@ -352,3 +352,4 @@ cp .dev.vars.example .dev.vars     # 然后填入两个随机串
 - 主线 `main` 受分支保护：必需检查「测试 / 审计 / 打包」通过才可合入，禁止强推与删除分支。
 - 带 `automerge` 标签的 PR（或 dependabot 发起的 PR）会由 `Auto merge` 工作流自动开启 squash 合并，检查变绿即自动合入并删除分支。
 - 依赖更新由 `.github/dependabot.yml` 每周一提 PR，自动打上 `automerge` 标签。
+- 自动合并已在真实 PR 上验证：gh pr merge --auto 会先等必需检查变绿，再 squash 合入并删除分支。
