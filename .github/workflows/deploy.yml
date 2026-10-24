@@ -84,7 +84,7 @@ jobs:
       - name: 安装依赖
         run: npm ci
       - name: 推送 secret 并发布
-        uses: cloudflare/wrangler-action@v3
+        uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
