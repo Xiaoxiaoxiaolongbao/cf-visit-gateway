@@ -85,6 +85,26 @@
   .thumb { width: 64px; height: 64px; border-radius: 8px; object-fit: cover; border: 1px solid var(--hair); flex: none; }
   .empty { color: var(--soft); font-size: 12.5px; padding: 10px 0; }
   .hide { display: none !important; }
+
+  /* 站内确认弹窗（替代原生 confirm） */
+  .ask { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; padding: 22px; }
+  .ask[hidden] { display: none; }
+  .ask-scrim { position: absolute; inset: 0; background: rgba(0, 0, 0, .72); }
+  .ask-panel {
+    position: relative; z-index: 1; width: min(420px, 100%); padding: 22px;
+    background: #101014; border: 1px solid var(--hair2); border-radius: 14px;
+    box-shadow: 0 40px 120px -40px rgba(0, 0, 0, .95);
+  }
+  .ask-kicker { margin: 0 0 10px; font-family: var(--mono); font-size: 9.5px; letter-spacing: .2em; text-transform: uppercase; color: var(--soft); }
+  .ask-panel h3 { margin: 0 0 10px; font-size: 15px; font-weight: 500; }
+  .ask-panel p { margin: 0 0 18px; font-size: 13px; line-height: 1.8; color: var(--ink); word-break: break-all; }
+  .ask-actions { display: flex; gap: 10px; justify-content: flex-end; }
+  .ask-actions button { font: inherit; font-size: 13px; padding: 9px 20px; border-radius: 980px; cursor: pointer; border: 1px solid var(--hair2); background: transparent; color: var(--fg); }
+  .ask-actions button:hover { background: rgba(255,255,255,.06); }
+  .ask-actions button.primary { background: var(--fg); color: #0a0a0c; border-color: var(--fg); }
+  .ask-actions button.primary:hover { background: #fff; }
+  .ask-actions button.danger { border-color: rgba(217,139,134,.45); color: var(--err); }
+  .ask-actions button.danger:hover { background: rgba(217,139,134,.1); }
   .domain { font-family: var(--mono); font-size: 11.5px; color: var(--fg); }
 </style>
 </head>
@@ -125,6 +145,19 @@
     <p class="status" id="bind-status"></p>
   </section>
 
+  <div class="ask" id="ask" hidden role="dialog" aria-modal="true" aria-labelledby="ask-title">
+    <div class="ask-scrim" data-ask="cancel"></div>
+    <div class="ask-panel">
+      <p class="ask-kicker">Confirm</p>
+      <h3 id="ask-title">确认</h3>
+      <p id="ask-body"></p>
+      <div class="ask-actions">
+        <button id="ask-cancel" type="button">取消</button>
+        <button id="ask-ok" class="primary danger" type="button">确认</button>
+      </div>
+    </div>
+  </div>
+
   <section id="manage" class="hide">
     <div class="tabs" role="tablist">
       <button role="tab" aria-selected="true" data-tab="danmaku">弹幕</button>
@@ -164,6 +197,44 @@
   let state = { authed: false, passkeys: [], rpId: "", vault: false, uploads: false };
   let tab = "danmaku";
   let cache = { danmaku: [], uploads: [], blocks: [] };
+
+  /** 站内确认弹窗，替代 window.confirm（返回 Promise<boolean>） */
+  function askConfirm(options) {
+    return new Promise((resolve) => {
+      const box = $("ask");
+      if (!box) return resolve(window.confirm(options.body || "确认？"));
+      $("ask-title").textContent = options.title || "确认";
+      $("ask-body").textContent = options.body || "";
+      const ok = $("ask-ok");
+      const cancel = $("ask-cancel");
+      ok.textContent = options.okLabel || "确认";
+      ok.className = "primary" + (options.danger === false ? "" : " danger");
+      box.hidden = false;
+      cancel.focus();
+
+      function done(value) {
+        box.hidden = true;
+        ok.removeEventListener("click", onOk);
+        cancel.removeEventListener("click", onCancel);
+        box.removeEventListener("click", onScrim);
+        document.removeEventListener("keydown", onKey);
+        resolve(value);
+      }
+      const onOk = () => done(true);
+      const onCancel = () => done(false);
+      const onScrim = (e) => {
+        if (e.target && e.target.nodeType === 1 && e.target.getAttribute("data-ask") === "cancel") done(false);
+      };
+      const onKey = (e) => {
+        if (e.key === "Escape") done(false);
+        if (e.key === "Enter") done(true);
+      };
+      ok.addEventListener("click", onOk);
+      cancel.addEventListener("click", onCancel);
+      box.addEventListener("click", onScrim);
+      document.addEventListener("keydown", onKey);
+    });
+  }
 
   function say(id, text, kind) {
     const el = $(id);
@@ -443,7 +514,11 @@
           label: "拉黑",
           className: "",
           onClick: async () => {
-            const ok = window.confirm("确认拉黑该 IP？\n\n" + item.ip + "\n\n拉黑后该 IP 无法上传图片与发送弹幕，可在「黑名单」里解除。");
+            const ok = await askConfirm({
+              title: "拉黑这个 IP？",
+              body: item.ip + " —— 拉黑后该 IP 无法上传图片与发送弹幕，可在「黑名单」里解除。",
+              okLabel: "拉黑",
+            });
             if (!ok) return;
             await api("/block", { method: "POST", body: { ip: item.ip, reason: "手动拉黑" } });
             say("panel-status", "已拉黑 " + item.ip, "ok");
@@ -457,7 +532,12 @@
           label: "解除",
           className: "",
           onClick: async () => {
-            const ok = window.confirm("确认解除对该 IP 的上传限制？\n\n" + item.ip);
+            const ok = await askConfirm({
+              title: "解除这个 IP 的限制？",
+              body: item.ip + " —— 解除后该 IP 可以重新上传图片与发送弹幕。",
+              okLabel: "解除",
+              danger: false,
+            });
             if (!ok) return;
             await api("/unblock", { method: "POST", body: { ip: item.ip } });
             say("panel-status", "已解除 " + item.ip, "ok");
