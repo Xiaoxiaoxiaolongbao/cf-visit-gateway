@@ -393,6 +393,56 @@ await it("站长私信：管理接口未登录 401", async () => {
   );
   assert.equal(r.status, 401);
 });
+
+await it("会话接口不向匿名者泄露 passkey 明细（只回数量）", async () => {
+  const e = env({
+    VAULT: vaultStub((path) => {
+      if (path === "/passkeys") return { items: [{ id: "cred1", name: "Mozilla/5.0 Secret-UA", created: 1 }] };
+      return { items: [] };
+    }),
+  });
+  const res = await call("/admin/api/session", {}, e);
+  const data = await res.json();
+  assert.equal(data.authed, false);
+  assert.equal(data.passkeyCount, 1, "应返回数量");
+  assert.deepEqual(data.passkeys, [], "匿名时不得返回凭据名称");
+  assert.equal(JSON.stringify(data).includes("Mozilla"), false);
+});
+
+await it("上传：像素炸弹（30000x30000 PNG）被拒 413", async () => {
+  const png = Buffer.alloc(64);
+  Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(png, 0);
+  png.writeUInt32BE(30000, 16);
+  png.writeUInt32BE(30000, 20);
+  const e = env({ VAULT: vaultStub(() => ({ ok: true, item: { id: "x" } })), UPLOADS: kvStub() });
+  const res = await call("/api/wall/upload", { method: "POST", headers: { "content-type": "image/png" }, body: png }, e);
+  assert.equal(res.status, 413);
+  assert.match((await res.json()).error, /过大/);
+});
+
+await it("IP 归一化：IPv4 映射的 IPv6 与 IPv4 视为同一来源", async () => {
+  const { normIp } = await import("../src/vault.js");
+  assert.equal(normIp("::ffff:203.0.113.9"), "203.0.113.9");
+  assert.equal(normIp("::FFFF:203.0.113.9"), "203.0.113.9");
+  assert.equal(normIp("  203.0.113.9  "), "203.0.113.9");
+  assert.equal(normIp("2001:DB8::1"), "2001:db8::1");
+});
+
+await it("管理写接口拒绝跨站 Origin", async () => {
+  const e = env({ VAULT: vaultStub(() => ({ items: [] })) });
+  const res = await call(
+    "/admin/api/block",
+    {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: "https://evil.example" },
+      body: JSON.stringify({ ip: "1.2.3.4" }),
+    },
+    e,
+  );
+  assert.equal(res.status, 403, "跨站写请求应被拒");
+  assert.match((await res.json()).error, /跨站/);
+});
+
 /* ------------------------------------------------------------------ 汇总 */
 
 let pass = 0;

@@ -189,6 +189,9 @@ function truthy(value) {
 
 /* -------------------------------------------------------------- 页面渲染 */
 
+/** 全站统一的 HSTS（一年 + 子域） */
+const HSTS = "max-age=31536000; includeSubDomains";
+
 async function servePage(cfg) {
   const paths = await derivePaths(cfg.secret);
   const nonce = randomId(16);
@@ -217,6 +220,7 @@ async function servePage(cfg) {
       "content-type": "text/html; charset=utf-8",
       // 页面携带会过期的签名，禁止任何中间层缓存
       "cache-control": "no-store",
+      "strict-transport-security": HSTS,
       "content-security-policy":
         `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'nonce-${nonce}'; ` +
         "img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
@@ -272,6 +276,7 @@ async function serveMailPage(cfg, url) {
     headers: {
       "content-type": "text/html; charset=utf-8",
       "cache-control": "no-store",
+      "strict-transport-security": HSTS,
       "content-security-policy":
         `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'nonce-${nonce}'; ` +
         "img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
@@ -563,6 +568,7 @@ function galleryImage(index) {
       "content-type": "image/jpeg",
       "cache-control": "public, max-age=604800",
       "x-content-type-options": "nosniff",
+      "strict-transport-security": HSTS,
     },
   });
 }

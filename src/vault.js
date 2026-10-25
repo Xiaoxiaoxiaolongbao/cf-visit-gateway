@@ -30,6 +30,7 @@ const DDL = [
      reply TEXT NOT NULL DEFAULT '', replied INTEGER NOT NULL DEFAULT 0
    )`,
   `CREATE INDEX IF NOT EXISTS messages_created ON messages (created DESC)`,
+  `CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS blocks (
      ip TEXT PRIMARY KEY, created INTEGER NOT NULL, reason TEXT NOT NULL DEFAULT ''
    )`,
@@ -54,6 +55,16 @@ const json = (body, status = 200) =>
   });
 
 const clean = (value, max) => String(value == null ? "" : value).slice(0, max);
+
+/**
+ * IP 归一化：IPv4 映射的 IPv6（::ffff:1.2.3.4）会被当成另一个值绕过黑名单，
+ * 这里统一去掉前缀并小写。
+ */
+export function normIp(raw) {
+  let ip = clean(raw, 64).trim().toLowerCase();
+  if (ip.startsWith("::ffff:")) ip = ip.slice(7);
+  return clean(ip, 45);
+}
 
 export class Vault {
   constructor(state) {
@@ -96,6 +107,9 @@ export class Vault {
             return this.replyMessage(body);
           case "/messages/remove":
             this.sql.exec("DELETE FROM messages WHERE id = ?", String(body.id || ""));
+            return json({ ok: true });
+          case "/meta":
+            this.sql.exec("INSERT OR REPLACE INTO meta (k, v) VALUES (?, ?)", String(body.k || ""), String(body.v || ""));
             return json({ ok: true });
           case "/block":
             return this.addBlock(body);
@@ -156,6 +170,10 @@ export class Vault {
             .toArray();
           return json({ item: rows[0] || null });
         }
+        case "/meta": {
+          const rows = this.sql.exec("SELECT v FROM meta WHERE k = ?", url.searchParams.get("k") || "").toArray();
+          return json({ v: rows[0] ? rows[0].v : null });
+        }
         case "/blocks":
           return json({ items: this.sql.exec("SELECT ip, created, reason FROM blocks ORDER BY created DESC").toArray() });
         case "/passkeys":
@@ -186,7 +204,7 @@ export class Vault {
     const color = /^#[0-9a-f]{6}$/i.test(String(body.color || "")) ? String(body.color).toLowerCase() : "#f5f5f7";
     const size = Math.min(28, Math.max(12, Number(body.size) || 15));
     const iphash = clean(body.iphash, 64);
-    const ip = clean(body.ip, 45);
+    const ip = normIp(body.ip);
     const now = Date.now();
 
     if (!text) return json({ error: "内容为空" }, 400);
@@ -229,7 +247,7 @@ export class Vault {
     const id = String(body.id || "");
     if (!/^[a-z0-9]{16,32}$/.test(id)) return json({ error: "id 非法" }, 400);
 
-    const ip = clean(body.ip, 45);
+    const ip = normIp(body.ip);
     if (ip && this.sql.exec("SELECT 1 AS hit FROM blocks WHERE ip = ?", ip).toArray().length) {
       return json({ error: "该 IP 已被限制上传", blocked: true }, 403);
     }
@@ -260,7 +278,7 @@ export class Vault {
   /* ---------------------------------------------------------- 黑名单 */
 
   addBlock(body) {
-    const ip = clean(body.ip, 45);
+    const ip = normIp(body.ip);
     if (!ip) return json({ error: "缺少 IP" }, 400);
     this.sql.exec(
       "INSERT OR REPLACE INTO blocks (ip, created, reason) VALUES (?, ?, ?)",
@@ -298,7 +316,7 @@ Object.assign(Vault.prototype, {
     const text = clean(body.body, MAX_MESSAGE).trim();
     if (!text) return json({ error: "内容为空" }, 400);
 
-    const ip = clean(body.ip, 45);
+    const ip = normIp(body.ip);
     if (ip && this.sql.exec("SELECT 1 AS hit FROM blocks WHERE ip = ?", ip).toArray().length) {
       return json({ error: "该网络已被限制提交", blocked: true }, 403);
     }

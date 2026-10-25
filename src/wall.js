@@ -48,11 +48,21 @@ async function sign(secret, payload) {
   return `${body}.${mac}`;
 }
 
+/** 常量时间比较，避免 MAC 逐字节比较的时序侧信道 */
+function timingSafeEqualStr(a, b) {
+  const x = String(a);
+  const y = String(b);
+  if (x.length !== y.length) return false;
+  let diff = 0;
+  for (let i = 0; i < x.length; i += 1) diff |= x.charCodeAt(i) ^ y.charCodeAt(i);
+  return diff === 0;
+}
+
 async function unsign(secret, token) {
   if (typeof token !== "string" || !token.includes(".")) return null;
   const [body, mac] = token.split(".");
   const expect = b64uEncode(await hmac(secret, body));
-  if (mac !== expect) return null;
+  if (!timingSafeEqualStr(mac, expect)) return null;
   try {
     const payload = JSON.parse(new TextDecoder().decode(b64uDecode(body)));
     if (!payload || typeof payload.exp !== "number" || payload.exp < Date.now()) return null;
@@ -115,10 +125,27 @@ function allowedOrigins(url) {
   return new Set([`${url.protocol}//${bare}${port}`, `${url.protocol}//www.${bare}${port}`]);
 }
 
-async function isAuthed(request, url, cfg) {
+/** 吊销点缓存：避免每个管理请求都打一次 Durable Object */
+let revokeCache = { at: 0, value: 0 };
+
+async function revokedBefore(env) {
+  if (Date.now() - revokeCache.at < 30000) return revokeCache.value;
+  const got = await vaultCall(env, "/meta?k=logoutEpoch");
+  const value = Number((got && got.v) || 0) || 0;
+  revokeCache = { at: Date.now(), value };
+  return value;
+}
+
+async function isAuthed(request, url, cfg, env) {
   if (!cfg || !cfg.apiSecret) return false;
   const sess = await unsign(cfg.apiSecret, cookie(request, "vw-sess"));
-  return Boolean(sess && sess.role === "admin");
+  if (!sess || sess.role !== "admin") return false;
+  // 登出会把 logoutEpoch 抬到当前时间，此后签发的会话才算有效
+  if (env) {
+    const cut = await revokedBefore(env);
+    if (cut && (Number(sess.iat) || 0) < cut) return false;
+  }
+  return true;
 }
 
 function hasAdminToken(request, cfg) {
@@ -180,6 +207,31 @@ export async function handleDanmakuPost(request, env, url, cfg) {
 
 /* ------------------------------------------------------------ 传图片 */
 
+/** 从文件头读宽高（PNG / GIF / WebP-VP8X / JPEG）；读不出就返回 null，不误杀 */
+function imageSize(b) {
+  try {
+    if (b[0] === 0x89 && b[1] === 0x50) {
+      return { w: ((b[16] << 24) | (b[17] << 16) | (b[18] << 8) | b[19]) >>> 0, h: ((b[20] << 24) | (b[21] << 16) | (b[22] << 8) | b[23]) >>> 0 };
+    }
+    if (b[0] === 0x47 && b[1] === 0x49) return { w: b[6] | (b[7] << 8), h: b[8] | (b[9] << 8) };
+    if (b[0] === 0x52 && b[8] === 0x57 && b[12] === 0x56 && b[13] === 0x50 && b[14] === 0x38 && b[15] === 0x58) {
+      return { w: 1 + (b[24] | (b[25] << 8) | (b[26] << 16)), h: 1 + (b[27] | (b[28] << 8) | (b[29] << 16)) };
+    }
+    if (b[0] === 0xff && b[1] === 0xd8) {
+      let i = 2;
+      while (i < b.length - 9) {
+        if (b[i] !== 0xff) { i += 1; continue; }
+        const m = b[i + 1];
+        if (m >= 0xc0 && m <= 0xcf && m !== 0xc4 && m !== 0xc8 && m !== 0xcc) {
+          return { h: (b[i + 5] << 8) | b[i + 6], w: (b[i + 7] << 8) | b[i + 8] };
+        }
+        i += 2 + ((b[i + 2] << 8) | b[i + 3]);
+      }
+    }
+  } catch {}
+  return null;
+}
+
 const MAGIC = [
   { mime: "image/jpeg", test: (b) => b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff },
   { mime: "image/png", test: (b) => b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47 },
@@ -203,6 +255,12 @@ export async function handleUploadPost(request, env, url, cfg) {
 
   const kind = MAGIC.find((m) => m.test(buf));
   if (!kind) return json({ error: "只接受 JPG / PNG / GIF / WebP" }, 415);
+
+  // 像素炸弹：不看尺寸就会让看图的人浏览器吃满内存
+  const dim = imageSize(buf);
+  if (dim && dim.w * dim.h > 40_000_000) {
+    return json({ error: `图片过大（${dim.w}x${dim.h}），请压缩到 4000 万像素以内` }, 413);
+  }
 
   const id = randomId(10);
   const title = String(url.searchParams.get("title") || "").slice(0, 60);
@@ -284,6 +342,7 @@ export async function handleImageGet(env, url, id) {
   return new Response(got.value, {
     headers: {
       "content-type": meta.mime || "application/octet-stream",
+      "strict-transport-security": "max-age=31536000; includeSubDomains",
       "content-length": String(got.value.byteLength),
       "cache-control": "public, max-age=31536000, immutable",
       "x-content-type-options": "nosniff",
@@ -304,6 +363,7 @@ export function handleAdminPage() {
       "cache-control": "no-store",
       "x-robots-tag": "noindex, nofollow",
       "referrer-policy": "no-referrer",
+      "strict-transport-security": "max-age=31536000; includeSubDomains",
       "x-content-type-options": "nosniff",
       "content-security-policy":
         `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'nonce-${nonce}'; ` +
@@ -314,21 +374,33 @@ export function handleAdminPage() {
 
 export async function handleAdminApi(request, env, url, cfg) {
   const path = url.pathname.replace(/^\/admin\/api/, "");
-  const authed = await isAuthed(request, url, cfg);
+
+  // CSRF 防护：写操作若带 Origin，必须与本站同源（浏览器跨站请求一定带 Origin）
+  if (request.method !== "GET") {
+    const originHeader = request.headers.get("origin");
+    if (originHeader && !allowedOrigins(url).has(originHeader)) {
+      return json({ error: "跨站请求被拒绝" }, 403);
+    }
+  }
+
+  const authed = await isAuthed(request, url, cfg, env);
   const tokenOk = hasAdminToken(request, cfg);
   const rpId = rpDomain(url);
   const origin = url.origin;
 
   /* --- 会话状态 --- */
   if (path === "/session" && request.method === "GET") {
-    const passkeys = (await vaultCall(env, "/passkeys")) || { items: [] };
+    const list = (await vaultCall(env, "/passkeys")) || { items: [] };
+    const all = list.items || [];
+    // 未登录时只回数量，不回名称/时间（名称里带浏览器 UA，属指纹级信息）
     return json({
       authed,
       tokenOk,
       rpId,
       host: url.hostname,
       origin,
-      passkeys: passkeys.items || [],
+      passkeyCount: all.length,
+      passkeys: authed ? all : [],
       vault: Boolean(vault(env)),
       uploads: Boolean(env.UPLOADS),
     });
@@ -417,7 +489,7 @@ export async function handleAdminApi(request, env, url, cfg) {
         name: String(body.name || "").slice(0, 40),
       });
       if (!stored || !stored.ok) return json({ error: "保存凭据失败：Vault 未就绪" }, 500);
-      const sess = await sign(cfg.apiSecret, { role: "admin", exp: Date.now() + SESSION_TTL });
+      const sess = await sign(cfg.apiSecret, { role: "admin", iat: Date.now(), exp: Date.now() + SESSION_TTL });
       return json({ ok: true, credentialId: reg.credentialId }, 200, {
         "set-cookie": setCookie("vw-sess", sess, SESSION_TTL),
       });
@@ -447,7 +519,7 @@ export async function handleAdminApi(request, env, url, cfg) {
         alg: key.alg,
       });
       await vaultPost(env, "/passkey/counter", { id, signCount: res.signCount });
-      const sess = await sign(cfg.apiSecret, { role: "admin", exp: Date.now() + SESSION_TTL });
+      const sess = await sign(cfg.apiSecret, { role: "admin", iat: Date.now(), exp: Date.now() + SESSION_TTL });
       return json({ ok: true }, 200, { "set-cookie": setCookie("vw-sess", sess, SESSION_TTL) });
     } catch (err) {
       return json({ error: String(err.message || err) }, 400);
@@ -463,7 +535,7 @@ export async function handleAdminApi(request, env, url, cfg) {
     if ((existing.items || []).length > 0) {
       return json({ error: "已有 passkey，令牌通道已关闭；请直接用 passkey 登录" }, 403);
     }
-    const sess = await sign(cfg.apiSecret, { role: "admin", exp: Date.now() + BOOTSTRAP_TTL });
+    const sess = await sign(cfg.apiSecret, { role: "admin", iat: Date.now(), exp: Date.now() + BOOTSTRAP_TTL });
     return json({ ok: true, ttl: BOOTSTRAP_TTL }, 200, { "set-cookie": setCookie("vw-sess", sess, BOOTSTRAP_TTL) });
   }
 
@@ -471,6 +543,9 @@ export async function handleAdminApi(request, env, url, cfg) {
   if (!authed && !(await tokenUsable(env, request, cfg))) return json({ error: "未登录" }, 401);
 
   if (path === "/logout" && request.method === "POST") {
+    // 真正吊销：抬高点位，所有更早签发的会话立即失效（不只是清浏览器 cookie）
+    await vaultPost(env, "/meta", { k: "logoutEpoch", v: String(Date.now()) });
+    revokeCache = { at: 0, value: 0 };
     return json({ ok: true }, 200, { "set-cookie": setCookie("vw-sess", "", 1) });
   }
 

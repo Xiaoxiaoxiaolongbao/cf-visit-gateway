@@ -207,7 +207,7 @@
     },
   };
 
-  let state = { authed: false, passkeys: [], rpId: "", vault: false, uploads: false };
+  let state = { authed: false, passkeys: [], passkeyCount: 0, rpId: "", vault: false, uploads: false };
   let tab = "danmaku";
   let cache = { danmaku: [], uploads: [], blocks: [], messages: [] };
 
@@ -293,7 +293,7 @@
       return;
     }
 
-    const hasKey = state.passkeys.length > 0;
+    const hasKey = (state.passkeyCount ?? state.passkeys.length) > 0;
     const label = $("domain-label");
     if (label) label.textContent = state.rpId || location.hostname;
 
