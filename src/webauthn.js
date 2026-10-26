@@ -215,7 +215,7 @@ function checkClientData(json, expectedType, challenge, origin) {
   return data;
 }
 
-export async function verifyRegistration({ payload, challenge, origin, rpId }) {
+export async function verifyRegistration({ payload, challenge, origin, rpId, requireUV = true }) {
   checkClientData(payload.clientDataJSON, "webauthn.create", challenge, origin);
 
   const att = cborDecode(b64uDecode(payload.attestationObject));
@@ -225,13 +225,15 @@ export async function verifyRegistration({ payload, challenge, origin, rpId }) {
   const expectRp = await sha256(TE.encode(rpId));
   if (!bytesEq(auth.rpIdHash, expectRp)) throw new Error("rpIdHash 不匹配");
   if (!(auth.flags & 0x01)) throw new Error("用户未完成存在性验证");
+  // 我们请求的是 userVerification=required，就必须校验 UV 标志，否则模拟器可跳过
+  if (requireUV && !(auth.flags & 0x04)) throw new Error("未完成用户验证（UV 标志缺失）");
   if (!auth.credentialId || !auth.cose) throw new Error("缺少凭据或公钥");
 
   const { alg, jwk } = coseToKey(auth.cose);
   return { credentialId: b64uEncode(auth.credentialId), alg, jwk, signCount: auth.signCount };
 }
 
-export async function verifyAssertion({ payload, challenge, origin, rpId, jwk, alg }) {
+export async function verifyAssertion({ payload, challenge, origin, rpId, jwk, alg, storedCount = 0, requireUV = true }) {
   checkClientData(payload.clientDataJSON, "webauthn.get", challenge, origin);
 
   const authData = b64uDecode(payload.authenticatorData);
@@ -239,6 +241,11 @@ export async function verifyAssertion({ payload, challenge, origin, rpId, jwk, a
   const expectRp = await sha256(TE.encode(rpId));
   if (!bytesEq(auth.rpIdHash, expectRp)) throw new Error("rpIdHash 不匹配");
   if (!(auth.flags & 0x01)) throw new Error("用户未完成存在性验证");
+  if (requireUV && !(auth.flags & 0x04)) throw new Error("未完成用户验证（UV 标志缺失）");
+  // 计数器必须递增：为 0 的认证器不做约束，其余情况出现「不增」视为克隆凭据
+  if (storedCount > 0 && auth.signCount > 0 && auth.signCount <= storedCount) {
+    throw new Error("认证器计数器未递增，疑似克隆凭据");
+  }
 
   const key = await crypto.subtle.importKey("jwk", jwk, IMPORT_ALG[jwk.kty], false, ["verify"]);
   const clientHash = await sha256(b64uDecode(payload.clientDataJSON));

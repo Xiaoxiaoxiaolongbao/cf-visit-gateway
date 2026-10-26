@@ -1541,7 +1541,7 @@ function checkClientData(json5, expectedType, challenge, origin) {
   if (!origin || data.origin !== origin) throw new Error(`origin 不匹配：${data.origin}`);
   return data;
 }
-async function verifyRegistration({ payload, challenge, origin, rpId }) {
+async function verifyRegistration({ payload, challenge, origin, rpId, requireUV = true }) {
   checkClientData(payload.clientDataJSON, "webauthn.create", challenge, origin);
   const att = cborDecode(b64uDecode(payload.attestationObject));
   if (!att || !att.authData) throw new Error("attestationObject 结构异常");
@@ -1549,17 +1549,22 @@ async function verifyRegistration({ payload, challenge, origin, rpId }) {
   const expectRp = await sha256(TE.encode(rpId));
   if (!bytesEq(auth.rpIdHash, expectRp)) throw new Error("rpIdHash 不匹配");
   if (!(auth.flags & 1)) throw new Error("用户未完成存在性验证");
+  if (requireUV && !(auth.flags & 4)) throw new Error("未完成用户验证（UV 标志缺失）");
   if (!auth.credentialId || !auth.cose) throw new Error("缺少凭据或公钥");
   const { alg, jwk } = coseToKey(auth.cose);
   return { credentialId: b64uEncode(auth.credentialId), alg, jwk, signCount: auth.signCount };
 }
-async function verifyAssertion({ payload, challenge, origin, rpId, jwk, alg }) {
+async function verifyAssertion({ payload, challenge, origin, rpId, jwk, alg, storedCount = 0, requireUV = true }) {
   checkClientData(payload.clientDataJSON, "webauthn.get", challenge, origin);
   const authData = b64uDecode(payload.authenticatorData);
   const auth = parseAuthData(authData);
   const expectRp = await sha256(TE.encode(rpId));
   if (!bytesEq(auth.rpIdHash, expectRp)) throw new Error("rpIdHash 不匹配");
   if (!(auth.flags & 1)) throw new Error("用户未完成存在性验证");
+  if (requireUV && !(auth.flags & 4)) throw new Error("未完成用户验证（UV 标志缺失）");
+  if (storedCount > 0 && auth.signCount > 0 && auth.signCount <= storedCount) {
+    throw new Error("认证器计数器未递增，疑似克隆凭据");
+  }
   const key = await crypto.subtle.importKey("jwk", jwk, IMPORT_ALG[jwk.kty], false, ["verify"]);
   const clientHash = await sha256(b64uDecode(payload.clientDataJSON));
   const signed = concat(authData, clientHash);
@@ -1732,8 +1737,22 @@ function imageSize(b) {
       return { w: (b[16] << 24 | b[17] << 16 | b[18] << 8 | b[19]) >>> 0, h: (b[20] << 24 | b[21] << 16 | b[22] << 8 | b[23]) >>> 0 };
     }
     if (b[0] === 71 && b[1] === 73) return { w: b[6] | b[7] << 8, h: b[8] | b[9] << 8 };
-    if (b[0] === 82 && b[8] === 87 && b[12] === 86 && b[13] === 80 && b[14] === 56 && b[15] === 88) {
-      return { w: 1 + (b[24] | b[25] << 8 | b[26] << 16), h: 1 + (b[27] | b[28] << 8 | b[29] << 16) };
+    if (b[0] === 82 && b[1] === 73 && b[2] === 70 && b[3] === 70 && b[8] === 87 && b[9] === 69) {
+      const chunk = String.fromCharCode(b[12], b[13], b[14], b[15]);
+      if (chunk === "VP8X") {
+        return { w: 1 + (b[24] | b[25] << 8 | b[26] << 16), h: 1 + (b[27] | b[28] << 8 | b[29] << 16) };
+      }
+      if (chunk === "VP8L") {
+        const b0 = b[21], b1 = b[22], b2 = b[23], b3 = b[24];
+        return { w: 1 + ((b1 & 63) << 8 | b0), h: 1 + ((b3 & 15) << 10 | b2 << 2 | (b1 & 192) >> 6) };
+      }
+      if (chunk === "VP8 ") {
+        for (let i = 20; i < Math.min(b.length - 7, 64); i += 1) {
+          if (b[i] === 157 && b[i + 1] === 1 && b[i + 2] === 42) {
+            return { w: (b[i + 3] | b[i + 4] << 8) & 16383, h: (b[i + 5] | b[i + 6] << 8) & 16383 };
+          }
+        }
+      }
     }
     if (b[0] === 255 && b[1] === 216) {
       let i = 2;
@@ -1893,6 +1912,9 @@ async function handleAdminApi(request, env, url, cfg) {
       uploads: Boolean(env.UPLOADS)
     });
   }
+  if (!cfg.apiSecret && path.startsWith("/passkey")) {
+    return json({ error: "服务端未配置 API_SECRET，管理登录不可用" }, 503);
+  }
   if (path === "/passkey/options" && request.method === "POST") {
     const body = await request.json().catch(() => ({}));
     const mode = body.mode === "register" ? "register" : "login";
@@ -1969,11 +1991,12 @@ async function handleAdminApi(request, env, url, cfg) {
       });
       if (!stored || !stored.ok) return json({ error: "保存凭据失败：Vault 未就绪" }, 500);
       const sess = await sign(cfg.apiSecret, { role: "admin", iat: Date.now(), exp: Date.now() + SESSION_TTL });
-      return json({ ok: true, credentialId: reg.credentialId }, 200, {
-        "set-cookie": setCookie("vw-sess", sess, SESSION_TTL)
-      });
+      const headers = new Headers({ "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+      headers.append("set-cookie", setCookie("vw-sess", sess, SESSION_TTL));
+      headers.append("set-cookie", setCookie("vw-chal", "", 1));
+      return new Response(JSON.stringify({ ok: true, credentialId: reg.credentialId }), { status: 200, headers });
     } catch (err) {
-      return json({ error: String(err.message || err) }, 400);
+      return json({ error: String(err.message || err) }, 400, { "set-cookie": setCookie("vw-chal", "", 1) });
     }
   }
   if (path === "/passkey/login" && request.method === "POST") {
@@ -1983,7 +2006,9 @@ async function handleAdminApi(request, env, url, cfg) {
     const id = String(body.id || "");
     const rec = await vaultCall(env, `/passkey?id=${encodeURIComponent(id)}`);
     const key = rec && rec.item;
-    if (!key) return json({ error: "这台设备上还没有注册过的 passkey" }, 404);
+    if (!key) {
+      return json({ error: "这台设备上还没有注册过的 passkey" }, 404, { "set-cookie": setCookie("vw-chal", "", 1) });
+    }
     try {
       const res = await verifyAssertion({
         payload: body.response || {},
@@ -1991,13 +2016,17 @@ async function handleAdminApi(request, env, url, cfg) {
         origin,
         rpId,
         jwk: JSON.parse(key.jwk),
-        alg: key.alg
+        alg: key.alg,
+        storedCount: Number(key.signcount) || 0
       });
       await vaultPost(env, "/passkey/counter", { id, signCount: res.signCount });
       const sess = await sign(cfg.apiSecret, { role: "admin", iat: Date.now(), exp: Date.now() + SESSION_TTL });
-      return json({ ok: true }, 200, { "set-cookie": setCookie("vw-sess", sess, SESSION_TTL) });
+      const headers = new Headers({ "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+      headers.append("set-cookie", setCookie("vw-sess", sess, SESSION_TTL));
+      headers.append("set-cookie", setCookie("vw-chal", "", 1));
+      return new Response(JSON.stringify({ ok: true }), { status: 200, headers });
     } catch (err) {
-      return json({ error: String(err.message || err) }, 400);
+      return json({ error: String(err.message || err) }, 400, { "set-cookie": setCookie("vw-chal", "", 1) });
     }
   }
   if (path === "/token" && request.method === "POST") {
@@ -2479,6 +2508,7 @@ var DDL = [
    )`,
   `CREATE INDEX IF NOT EXISTS messages_created ON messages (created DESC)`,
   `CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT NOT NULL)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS messages_code ON messages (code)`,
   `CREATE TABLE IF NOT EXISTS blocks (
      ip TEXT PRIMARY KEY, created INTEGER NOT NULL, reason TEXT NOT NULL DEFAULT ''
    )`
@@ -2695,6 +2725,9 @@ var Vault = class {
   addPasskey(body) {
     const id = String(body.id || "");
     if (!id || !body.jwk) return json3({ error: "参数不全" }, 400);
+    if (this.sql.exec("SELECT 1 AS hit FROM passkeys WHERE id = ?", id).toArray().length) {
+      return json3({ error: "该凭据已存在" }, 409);
+    }
     this.sql.exec(
       "INSERT OR REPLACE INTO passkeys (id, jwk, alg, signcount, created, name) VALUES (?, ?, ?, ?, ?, ?)",
       id,
@@ -2722,7 +2755,16 @@ Object.assign(Vault.prototype, {
       if (recent >= 5) return json3({ error: "提交太频繁，一小时后再试" }, 429);
     }
     const id = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
-    const code = [...crypto.getRandomValues(new Uint8Array(5))].map((b) => b.toString(16).padStart(2, "0")).join("");
+    let code = "";
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const candidate = [...crypto.getRandomValues(new Uint8Array(8))].map((b) => b.toString(16).padStart(2, "0")).join("");
+      const taken = this.sql.exec("SELECT 1 AS hit FROM messages WHERE code = ?", candidate).toArray().length;
+      if (!taken) {
+        code = candidate;
+        break;
+      }
+    }
+    if (!code) return json3({ error: "生成查询码失败，请重试" }, 500);
     this.sql.exec(
       `INSERT INTO messages (id, code, name, contact, body, created, ip, bfp, dfp, reply, replied)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '', 0)`,

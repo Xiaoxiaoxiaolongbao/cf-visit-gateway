@@ -214,8 +214,25 @@ function imageSize(b) {
       return { w: ((b[16] << 24) | (b[17] << 16) | (b[18] << 8) | b[19]) >>> 0, h: ((b[20] << 24) | (b[21] << 16) | (b[22] << 8) | b[23]) >>> 0 };
     }
     if (b[0] === 0x47 && b[1] === 0x49) return { w: b[6] | (b[7] << 8), h: b[8] | (b[9] << 8) };
-    if (b[0] === 0x52 && b[8] === 0x57 && b[12] === 0x56 && b[13] === 0x50 && b[14] === 0x38 && b[15] === 0x58) {
-      return { w: 1 + (b[24] | (b[25] << 8) | (b[26] << 16)), h: 1 + (b[27] | (b[28] << 8) | (b[29] << 16)) };
+    // WebP 三种编码都要解析，否则换个子格式就能绕过像素上限
+    if (b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 && b[8] === 0x57 && b[9] === 0x45) {
+      const chunk = String.fromCharCode(b[12], b[13], b[14], b[15]);
+      if (chunk === "VP8X") {
+        return { w: 1 + (b[24] | (b[25] << 8) | (b[26] << 16)), h: 1 + (b[27] | (b[28] << 8) | (b[29] << 16)) };
+      }
+      if (chunk === "VP8L") {
+        // 14bit 宽 + 14bit 高，紧跟在 0x2F 之后
+        const b0 = b[21], b1 = b[22], b2 = b[23], b3 = b[24];
+        return { w: 1 + (((b1 & 0x3f) << 8) | b0), h: 1 + (((b3 & 0x0f) << 10) | (b2 << 2) | ((b1 & 0xc0) >> 6)) };
+      }
+      if (chunk === "VP8 ") {
+        // 有损帧头：找到 9d 01 2a 之后读 14bit 宽高
+        for (let i = 20; i < Math.min(b.length - 7, 64); i += 1) {
+          if (b[i] === 0x9d && b[i + 1] === 0x01 && b[i + 2] === 0x2a) {
+            return { w: (b[i + 3] | (b[i + 4] << 8)) & 0x3fff, h: (b[i + 5] | (b[i + 6] << 8)) & 0x3fff };
+          }
+        }
+      }
     }
     if (b[0] === 0xff && b[1] === 0xd8) {
       let i = 2;
@@ -407,6 +424,11 @@ export async function handleAdminApi(request, env, url, cfg) {
   }
 
   /* --- 注册 / 登录：第一步发 challenge --- */
+  // 没有 API_SECRET 时，会话与 challenge 只能用公开默认盐签名 → 可伪造，宁可不发
+  if (!cfg.apiSecret && path.startsWith("/passkey")) {
+    return json({ error: "服务端未配置 API_SECRET，管理登录不可用" }, 503);
+  }
+
   if (path === "/passkey/options" && request.method === "POST") {
     const body = await request.json().catch(() => ({}));
     const mode = body.mode === "register" ? "register" : "login";
@@ -490,11 +512,13 @@ export async function handleAdminApi(request, env, url, cfg) {
       });
       if (!stored || !stored.ok) return json({ error: "保存凭据失败：Vault 未就绪" }, 500);
       const sess = await sign(cfg.apiSecret, { role: "admin", iat: Date.now(), exp: Date.now() + SESSION_TTL });
-      return json({ ok: true, credentialId: reg.credentialId }, 200, {
-        "set-cookie": setCookie("vw-sess", sess, SESSION_TTL),
-      });
+      const headers = new Headers({ "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+      headers.append("set-cookie", setCookie("vw-sess", sess, SESSION_TTL));
+      headers.append("set-cookie", setCookie("vw-chal", "", 1)); // challenge 一次性
+      return new Response(JSON.stringify({ ok: true, credentialId: reg.credentialId }), { status: 200, headers });
     } catch (err) {
-      return json({ error: String(err.message || err) }, 400);
+      // 注册失败也把 challenge 烧掉，避免同一挑战被反复试
+      return json({ error: String(err.message || err) }, 400, { "set-cookie": setCookie("vw-chal", "", 1) });
     }
   }
 
@@ -507,7 +531,9 @@ export async function handleAdminApi(request, env, url, cfg) {
     const id = String(body.id || "");
     const rec = await vaultCall(env, `/passkey?id=${encodeURIComponent(id)}`);
     const key = rec && rec.item;
-    if (!key) return json({ error: "这台设备上还没有注册过的 passkey" }, 404);
+    if (!key) {
+      return json({ error: "这台设备上还没有注册过的 passkey" }, 404, { "set-cookie": setCookie("vw-chal", "", 1) });
+    }
 
     try {
       const res = await verifyAssertion({
@@ -517,12 +543,16 @@ export async function handleAdminApi(request, env, url, cfg) {
         rpId,
         jwk: JSON.parse(key.jwk),
         alg: key.alg,
+        storedCount: Number(key.signcount) || 0,
       });
       await vaultPost(env, "/passkey/counter", { id, signCount: res.signCount });
       const sess = await sign(cfg.apiSecret, { role: "admin", iat: Date.now(), exp: Date.now() + SESSION_TTL });
-      return json({ ok: true }, 200, { "set-cookie": setCookie("vw-sess", sess, SESSION_TTL) });
+      const headers = new Headers({ "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+      headers.append("set-cookie", setCookie("vw-sess", sess, SESSION_TTL));
+      headers.append("set-cookie", setCookie("vw-chal", "", 1)); // challenge 一次性
+      return new Response(JSON.stringify({ ok: true }), { status: 200, headers });
     } catch (err) {
-      return json({ error: String(err.message || err) }, 400);
+      return json({ error: String(err.message || err) }, 400, { "set-cookie": setCookie("vw-chal", "", 1) });
     }
   }
 

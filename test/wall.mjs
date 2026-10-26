@@ -443,6 +443,49 @@ await it("管理写接口拒绝跨站 Origin", async () => {
   assert.match((await res.json()).error, /跨站/);
 });
 
+
+await it("上传：WebP(VP8L) 声明超大尺寸同样被拒（换子格式不能绕过像素上限）", async () => {
+  const buf = Buffer.alloc(40);
+  buf.write("RIFF", 0, "ascii");
+  buf.write("WEBP", 8, "ascii");
+  buf.write("VP8L", 12, "ascii");
+  buf[20] = 0x2f;
+  const w = 15999;
+  const h = 15999;
+  buf[21] = w & 0xff;
+  buf[22] = ((w >> 8) & 0x3f) | ((h & 0x03) << 6);
+  buf[23] = (h >> 2) & 0xff;
+  buf[24] = (h >> 10) & 0x0f;
+  const e = env({ VAULT: vaultStub(() => ({ ok: true, item: { id: "x" } })), UPLOADS: kvStub() });
+  const res = await call(
+    "/api/wall/upload",
+    { method: "POST", headers: { "content-type": "image/webp" }, body: buf },
+    e,
+  );
+  assert.equal(res.status, 413, "VP8L 大图应被拒");
+});
+
+await it("私信：查询码为 16 位十六进制（8 字节随机）", async () => {
+  const e = env({ VAULT: vaultStub(() => ({ ok: true, id: "m", code: "aabbccdd00112233" })) });
+  const res = await call(
+    "/api/wall/message",
+    { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ body: "hi" }) },
+    e,
+  );
+  assert.equal(res.status, 201);
+  assert.match((await res.json()).code, /^[a-f0-9]{16}$/);
+});
+
+await it("未配置 API_SECRET 时拒绝签发管理会话", async () => {
+  const e = { ...env(), API_SECRET: "", VAULT: vaultStub(() => ({ items: [] })) };
+  const res = await call(
+    "/admin/api/passkey/options",
+    { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ mode: "login" }) },
+    e,
+  );
+  assert.equal(res.status, 503, "空密钥应直接 503");
+});
+
 /* ------------------------------------------------------------------ 汇总 */
 
 let pass = 0;
