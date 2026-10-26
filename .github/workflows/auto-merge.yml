@@ -2,7 +2,7 @@ name: Auto merge
 
 on:
   pull_request:
-    types: [opened, reopened, synchronize, labeled, ready_for_review]
+    types: [opened, reopened, synchronize, labeled, ready_for_review, closed]
 
 permissions:
   contents: write
@@ -54,3 +54,23 @@ jobs:
             echo "::error title=自动合并开启失败::gh pr merge --auto 返回非零，请看本步骤日志"
             exit 1
           fi
+
+  cleanup:
+    name: 清理合并后的分支
+    # --delete-branch 与 --auto 组合时常不生效，这里在 PR 关闭时兜底删源分支
+    if: github.event.action == 'closed' && github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: 删除 head 分支
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          SAME_REPO: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+        run: |
+          if [ "$SAME_REPO" != "true" ]; then
+            echo "来自 fork 的分支不删"
+            exit 0
+          fi
+          gh api -X DELETE "repos/${{ github.repository }}/git/refs/heads/$HEAD_REF" \
+            && echo "已删除分支 $HEAD_REF" \
+            || echo "::notice title=分支可能已被删除::$HEAD_REF"
