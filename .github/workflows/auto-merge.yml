@@ -1,0 +1,56 @@
+name: Auto merge
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, labeled, ready_for_review]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: automerge-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  enable:
+    name: 开启自动合并
+    # 只对「带 automerge 标签」或「dependabot 发起」的非草稿 PR 生效
+    if: |
+      github.event.pull_request.draft == false && (
+        contains(github.event.pull_request.labels.*.name, 'automerge') ||
+        github.actor == 'dependabot[bot]'
+      )
+    runs-on: ubuntu-latest
+    steps:
+      - name: 等 mergeable 就绪
+        id: wait
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          # GitHub 刚建 PR 时 mergeable 常为 UNKNOWN，此时 gh pr merge 会直接失败，
+          # 所以先轮询到能用为止（最多约 2 分钟）
+          for i in $(seq 1 12); do
+            state=$(gh pr view "$PR_NUMBER" --repo "${{ github.repository }}" --json mergeable --jq .mergeable)
+            echo "第 $i 次：mergeable=$state"
+            if [ "$state" != "UNKNOWN" ]; then
+              echo "ready=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "ready=false" >> "$GITHUB_OUTPUT"
+
+      - name: 开启自动合并（squash + 删分支）
+        if: steps.wait.outputs.ready == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          if gh pr merge "$PR_NUMBER" --repo "${{ github.repository }}" --squash --auto --delete-branch; then
+            echo "已开启自动合并：等「测试 / 审计 / 打包」变绿后自动合入并删除分支"
+          else
+            echo "::error title=自动合并开启失败::gh pr merge --auto 返回非零，请看本步骤日志"
+            exit 1
+          fi
