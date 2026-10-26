@@ -350,8 +350,8 @@ cp .dev.vars.example .dev.vars     # 然后填入两个随机串
 ## 协作与自动化
 
 - 主线 `main` 受分支保护：必需检查「测试 / 审计 / 打包」通过才可合入，禁止强推与删除分支。
-- 带 `automerge` 标签的 PR（或 dependabot 发起的 PR）由 `Auto merge` 工作流自动开启 squash 合并：必需检查「测试 / 审计 / 打包」变绿后自动合入并删除分支。
-- 依赖更新由 `.github/dependabot.yml` 每周一提 PR 并自动打上 `automerge` 标签。
+- **不自动合并**：仓库已关闭 `allow_auto_merge`，也没有 auto-merge 工作流；任何 PR（含 dependabot 依赖升级）都需人工 review 后手动 squash 合入。
+- 依赖更新由 `.github/dependabot.yml` 每周一提 PR，只做提示，不会自行合入。
 ## 安全
 
 外部攻击者视角做过两轮自测（常规清单 + 极端边界），结论与修复记录见 [docs/security-review.md](./docs/security-review.md)。
