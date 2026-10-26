@@ -11,7 +11,7 @@
  * 注意：单文件版只能使用 KV 后端（近似计数）。需要精确计数请用
  * wrangler 部署主项目（Durable Object 后端）。
  */
-var __toBinary = /* @__PURE__ */ (() => {
+var __toBinary = Uint8Array.fromBase64 || /* @__PURE__ */ (() => {
   var table = new Uint8Array(128);
   for (var i = 0; i < 64; i++) table[i < 26 ? i + 65 : i < 52 ? i + 71 : i < 62 ? i - 4 : i * 4 - 205] = i;
   return (base64) => {
