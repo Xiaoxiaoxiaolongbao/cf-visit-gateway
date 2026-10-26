@@ -31,6 +31,7 @@ const DDL = [
    )`,
   `CREATE INDEX IF NOT EXISTS messages_created ON messages (created DESC)`,
   `CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT NOT NULL)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS messages_code ON messages (code)`,
   `CREATE TABLE IF NOT EXISTS blocks (
      ip TEXT PRIMARY KEY, created INTEGER NOT NULL, reason TEXT NOT NULL DEFAULT ''
    )`,
@@ -294,6 +295,10 @@ export class Vault {
   addPasskey(body) {
     const id = String(body.id || "");
     if (!id || !body.jwk) return json({ error: "参数不全" }, 400);
+    // 不允许用同一个 credentialId 覆盖已存的公钥（否则拿到一次会话就能替换托管凭据）
+    if (this.sql.exec("SELECT 1 AS hit FROM passkeys WHERE id = ?", id).toArray().length) {
+      return json({ error: "该凭据已存在" }, 409);
+    }
     this.sql.exec(
       "INSERT OR REPLACE INTO passkeys (id, jwk, alg, signcount, created, name) VALUES (?, ?, ?, ?, ?, ?)",
       id,
@@ -330,9 +335,19 @@ Object.assign(Vault.prototype, {
     }
 
     const id = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
-    const code = [...crypto.getRandomValues(new Uint8Array(5))]
-      .map((b) => b.toString(16).padStart(2, "0"))
-      .join("");
+    // 查询码是别人读回复的唯一凭据：用 8 字节并对冲突重试，避免两条私信共享一个码
+    let code = "";
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const candidate = [...crypto.getRandomValues(new Uint8Array(8))]
+        .map((b) => b.toString(16).padStart(2, "0"))
+        .join("");
+      const taken = this.sql.exec("SELECT 1 AS hit FROM messages WHERE code = ?", candidate).toArray().length;
+      if (!taken) {
+        code = candidate;
+        break;
+      }
+    }
+    if (!code) return json({ error: "生成查询码失败，请重试" }, 500);
 
     this.sql.exec(
       `INSERT INTO messages (id, code, name, contact, body, created, ip, bfp, dfp, reply, replied)
