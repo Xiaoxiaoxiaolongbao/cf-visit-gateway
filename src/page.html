@@ -313,10 +313,11 @@
 
   /* 发送器：细线一行，克制 */
   .dm-composer {
-    display: flex; align-items: center; gap: 10px; margin: 26px 0 0;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 26px 0 0;
     padding: 10px 12px; border: 1px solid var(--hair); border-radius: 12px;
     animation: reveal 1s .36s var(--ease) both;
   }
+  .dm-composer input[type="text"] { flex: 1 1 140px; }
   .dm-composer input[type="text"] {
     flex: 1; min-width: 0; border: 0; background: transparent; color: var(--paper);
     font: inherit; font-size: 13px; padding: 4px 2px; outline: none;
@@ -1016,25 +1017,41 @@
       }
 
       // 自主上传的图片渲染进风采弹窗；点开原图
+      var lastUploadSig = "";
       function renderUploads(items) {
         var grid = byId("grid-user");
         var empty = byId("grid-user-empty");
         if (!grid) return;
+        var list = (items || []).slice(0, 60);
+        // 轮询每 20 秒一次，列表没变就别重建，否则弹窗会闪、滚动位置也丢
+        var sig = list.map(function (u) { return u.id; }).join(",");
+        if (sig === lastUploadSig) {
+          if (empty) empty.hidden = list.length > 0;
+          return;
+        }
+        lastUploadSig = sig;
         grid.innerHTML = "";
-        (items || []).slice(0, 60).forEach(function (u) {
+        list.forEach(function (u) {
           var a = document.createElement("a");
           a.href = "/img/" + u.id;
           a.target = "_blank";
           a.rel = "noopener noreferrer";
           var img = document.createElement("img");
-          img.src = "/img/" + u.id;
           img.alt = u.title || "自主上传的图片";
           img.loading = "lazy";
           img.decoding = "async";
+          // KV 最终一致：刚上传的图可能还没同步到本区，失败时带参数重试一次
+          var retried = false;
+          img.addEventListener("error", function () {
+            if (retried) return;
+            retried = true;
+            setTimeout(function () { img.src = "/img/" + u.id + "?r=1"; }, 1200);
+          });
+          img.src = "/img/" + u.id;
           a.appendChild(img);
           grid.appendChild(a);
         });
-        if (empty) empty.hidden = (items || []).length > 0;
+        if (empty) empty.hidden = list.length > 0;
       }
 
       function post() {
@@ -1051,13 +1068,22 @@
           .then(function (res) {
             send.disabled = false;
             if (!res.ok) {
-              say(res.d && res.d.blocked ? "该网络已被限制发送弹幕" : (res.d && res.d.error) || "发送失败");
+              var msg2 = res.d && res.d.blocked ? "该网络已被限制发送弹幕" : (res.d && res.d.error) || "发送失败";
+              if (res.d && res.d.retryAfter) msg2 += "（约 " + Math.max(1, Math.ceil(res.d.retryAfter / 60)) + " 分钟后可再试）";
+              say(msg2);
               return;
             }
             text.value = "";
             say("已飘上去啦");
             var mine = { text: value, color: picked, size: sizes[sizeIndex] };
-            float(mine);
+            if (pool.indexOf(mine) === -1) pool.push(mine);
+            lastNew += 1;
+            if (reduced) {
+              // 动效关闭时 float() 会直接返回，这里必须走静态渲染，否则用户看不到自己发的
+              renderStatic();
+            } else {
+              float(mine);
+            }
             if (res.d && res.d.item) {
               seen[res.d.item.id] = true;
               pool.push(res.d.item);
@@ -1212,7 +1238,9 @@
           .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
           .then(function (res) {
             if (!res.ok) {
-              say(res.d && res.d.blocked ? "该网络已被限制上传图片" : (res.d && res.d.error) || "上传失败");
+              var msg = res.d && res.d.blocked ? "该网络已被限制上传图片" : (res.d && res.d.error) || "上传失败";
+              if (res.d && res.d.retryAfter) msg += "（约 " + Math.ceil(res.d.retryAfter / 60) + " 分钟后可再试）";
+              say(msg);
               return;
             }
             say("上传成功，已放进「奶蛙中学风采 · 自主上传」");
@@ -1233,6 +1261,14 @@
         askConfirm(input.files && input.files[0]);
         input.value = "";
       });
+      // 拖到上传框以外时，浏览器默认会直接打开文件、把页面顶掉
+      ["dragover", "drop"].forEach(function (ev) {
+        document.addEventListener(ev, function (e) {
+          if (zone && zone.contains(e.target)) return;
+          e.preventDefault();
+        });
+      });
+
       if (zone) {
         ["dragenter", "dragover"].forEach(function (ev) {
           zone.addEventListener(ev, function (e) { e.preventDefault(); zone.classList.add("over"); });
@@ -1247,7 +1283,7 @@
       }
 
       load();
-      timer = setInterval(load, 45000);
+      timer = setInterval(load, 20000);
       window.addEventListener("pagehide", function () { if (timer) clearInterval(timer); });
     })();
 

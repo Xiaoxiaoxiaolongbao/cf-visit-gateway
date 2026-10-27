@@ -343,10 +343,11 @@ var page_default = `<!DOCTYPE html>
 
   /* 发送器：细线一行，克制 */
   .dm-composer {
-    display: flex; align-items: center; gap: 10px; margin: 26px 0 0;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 26px 0 0;
     padding: 10px 12px; border: 1px solid var(--hair); border-radius: 12px;
     animation: reveal 1s .36s var(--ease) both;
   }
+  .dm-composer input[type="text"] { flex: 1 1 140px; }
   .dm-composer input[type="text"] {
     flex: 1; min-width: 0; border: 0; background: transparent; color: var(--paper);
     font: inherit; font-size: 13px; padding: 4px 2px; outline: none;
@@ -1046,25 +1047,41 @@ var page_default = `<!DOCTYPE html>
       }
 
       // 自主上传的图片渲染进风采弹窗；点开原图
+      var lastUploadSig = "";
       function renderUploads(items) {
         var grid = byId("grid-user");
         var empty = byId("grid-user-empty");
         if (!grid) return;
+        var list = (items || []).slice(0, 60);
+        // 轮询每 20 秒一次，列表没变就别重建，否则弹窗会闪、滚动位置也丢
+        var sig = list.map(function (u) { return u.id; }).join(",");
+        if (sig === lastUploadSig) {
+          if (empty) empty.hidden = list.length > 0;
+          return;
+        }
+        lastUploadSig = sig;
         grid.innerHTML = "";
-        (items || []).slice(0, 60).forEach(function (u) {
+        list.forEach(function (u) {
           var a = document.createElement("a");
           a.href = "/img/" + u.id;
           a.target = "_blank";
           a.rel = "noopener noreferrer";
           var img = document.createElement("img");
-          img.src = "/img/" + u.id;
           img.alt = u.title || "自主上传的图片";
           img.loading = "lazy";
           img.decoding = "async";
+          // KV 最终一致：刚上传的图可能还没同步到本区，失败时带参数重试一次
+          var retried = false;
+          img.addEventListener("error", function () {
+            if (retried) return;
+            retried = true;
+            setTimeout(function () { img.src = "/img/" + u.id + "?r=1"; }, 1200);
+          });
+          img.src = "/img/" + u.id;
           a.appendChild(img);
           grid.appendChild(a);
         });
-        if (empty) empty.hidden = (items || []).length > 0;
+        if (empty) empty.hidden = list.length > 0;
       }
 
       function post() {
@@ -1081,13 +1098,22 @@ var page_default = `<!DOCTYPE html>
           .then(function (res) {
             send.disabled = false;
             if (!res.ok) {
-              say(res.d && res.d.blocked ? "该网络已被限制发送弹幕" : (res.d && res.d.error) || "发送失败");
+              var msg2 = res.d && res.d.blocked ? "该网络已被限制发送弹幕" : (res.d && res.d.error) || "发送失败";
+              if (res.d && res.d.retryAfter) msg2 += "（约 " + Math.max(1, Math.ceil(res.d.retryAfter / 60)) + " 分钟后可再试）";
+              say(msg2);
               return;
             }
             text.value = "";
             say("已飘上去啦");
             var mine = { text: value, color: picked, size: sizes[sizeIndex] };
-            float(mine);
+            if (pool.indexOf(mine) === -1) pool.push(mine);
+            lastNew += 1;
+            if (reduced) {
+              // 动效关闭时 float() 会直接返回，这里必须走静态渲染，否则用户看不到自己发的
+              renderStatic();
+            } else {
+              float(mine);
+            }
             if (res.d && res.d.item) {
               seen[res.d.item.id] = true;
               pool.push(res.d.item);
@@ -1242,7 +1268,9 @@ var page_default = `<!DOCTYPE html>
           .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
           .then(function (res) {
             if (!res.ok) {
-              say(res.d && res.d.blocked ? "该网络已被限制上传图片" : (res.d && res.d.error) || "上传失败");
+              var msg = res.d && res.d.blocked ? "该网络已被限制上传图片" : (res.d && res.d.error) || "上传失败";
+              if (res.d && res.d.retryAfter) msg += "（约 " + Math.ceil(res.d.retryAfter / 60) + " 分钟后可再试）";
+              say(msg);
               return;
             }
             say("上传成功，已放进「奶蛙中学风采 · 自主上传」");
@@ -1263,6 +1291,14 @@ var page_default = `<!DOCTYPE html>
         askConfirm(input.files && input.files[0]);
         input.value = "";
       });
+      // 拖到上传框以外时，浏览器默认会直接打开文件、把页面顶掉
+      ["dragover", "drop"].forEach(function (ev) {
+        document.addEventListener(ev, function (e) {
+          if (zone && zone.contains(e.target)) return;
+          e.preventDefault();
+        });
+      });
+
       if (zone) {
         ["dragenter", "dragover"].forEach(function (ev) {
           zone.addEventListener(ev, function (e) { e.preventDefault(); zone.classList.add("over"); });
@@ -1277,7 +1313,7 @@ var page_default = `<!DOCTYPE html>
       }
 
       load();
-      timer = setInterval(load, 45000);
+      timer = setInterval(load, 20000);
       window.addEventListener("pagehide", function () { if (timer) clearInterval(timer); });
     })();
 
@@ -1707,6 +1743,14 @@ async function handleWallGet(env) {
     enabled: Boolean(vault(env))
   });
 }
+async function isOwner(request, url, cfg, env) {
+  try {
+    if (await isAuthed(request, url, cfg, env)) return true;
+    if (hasAdminToken(request, cfg)) return true;
+  } catch {
+  }
+  return false;
+}
 async function handleDanmakuPost(request, env, url, cfg) {
   if (!vault(env)) return json({ error: "留言未启用" }, 503);
   const length = Number(request.headers.get("content-length") || 0);
@@ -1716,7 +1760,9 @@ async function handleDanmakuPost(request, env, url, cfg) {
   const ip = request.headers.get("cf-connecting-ip") || "0.0.0.0";
   const iphash = await sha256Hex(`${ip}|${cfg.apiSecret || ""}`);
   const fp = fingerprintsOf(request);
+  const skipLimit = await isOwner(request, url, cfg, env);
   const rec = await vaultRaw(env, "/danmaku", {
+    skipLimit,
     text: body.text,
     color: body.color,
     size: body.size,
@@ -1727,7 +1773,10 @@ async function handleDanmakuPost(request, env, url, cfg) {
   });
   if (rec.status !== 200 || !rec.data || rec.data.error) {
     const code = rec.status === 403 ? 403 : rec.status === 429 ? 429 : 400;
-    return json({ error: rec.data && rec.data.error || "写入失败", blocked: code === 403 }, code);
+    return json(
+      { error: rec.data && rec.data.error || "写入失败", blocked: code === 403, retryAfter: rec.data && rec.data.retryAfter },
+      code
+    );
   }
   return json({ ok: true, item: rec.data.item }, 201);
 }
@@ -1790,10 +1839,13 @@ async function handleUploadPost(request, env, url, cfg) {
   if (!buf.length) return json({ error: "空文件" }, 400);
   if (buf.length > MAX_UPLOAD) return json({ error: "超过 10MB" }, 413);
   const kind = MAGIC.find((m) => m.test(buf));
-  if (!kind) return json({ error: "只接受 JPG / PNG / GIF / WebP" }, 415);
+  if (!kind) {
+    const head = [...buf.slice(0, 4)].map((b) => b.toString(16).padStart(2, "0")).join(" ");
+    return json({ error: `不支持这种图片格式（文件头 ${head}），请用 JPG / PNG / GIF / WebP` }, 415);
+  }
   const dim = imageSize(buf);
-  if (dim && dim.w * dim.h > 4e7) {
-    return json({ error: `图片过大（${dim.w}x${dim.h}），请压缩到 4000 万像素以内` }, 413);
+  if (dim && dim.w * dim.h > 6e7) {
+    return json({ error: `图片过大（${dim.w}x${dim.h}），请压缩到 6000 万像素以内` }, 413);
   }
   const id = randomId(10);
   const title = String(url.searchParams.get("title") || "").slice(0, 60);
@@ -1803,7 +1855,9 @@ async function handleUploadPost(request, env, url, cfg) {
   const ip = request.headers.get("cf-connecting-ip") || "0.0.0.0";
   const iphash = await sha256Hex(`${ip}|${cfg.apiSecret || ""}`);
   const fp = fingerprintsOf(request);
+  const skipLimit = await isOwner(request, url, cfg, env);
   const rec = await vaultRaw(env, "/upload", {
+    skipLimit,
     id,
     mime: kind.mime,
     bytes: buf.length,
@@ -1830,7 +1884,9 @@ async function handleMessagePost(request, env, url, cfg) {
   const ip = request.headers.get("cf-connecting-ip") || "0.0.0.0";
   const iphash = await sha256Hex(`${ip}|${cfg.apiSecret || ""}`);
   const fp = fingerprintsOf(request);
+  const skipLimit = await isOwner(request, url, cfg, env);
   const rec = await vaultRaw(env, "/message", {
+    skipLimit,
     name: body.name,
     contact: body.contact,
     body: body.body,
@@ -2660,8 +2716,10 @@ var Vault = class {
     if (ip && this.sql.exec("SELECT 1 AS hit FROM blocks WHERE ip = ?", ip).toArray().length) {
       return json3({ error: "该网络已被限制发送，如有疑问可联系管理员", blocked: true }, 403);
     }
-    const recent = this.sql.exec("SELECT COUNT(*) AS n FROM danmaku WHERE iphash = ? AND created > ?", iphash, now - 6e4).one().n;
-    if (recent >= 3) return json3({ error: "发送太快，稍等一下" }, 429);
+    if (!body.skipLimit) {
+      const recent = this.sql.exec("SELECT COUNT(*) AS n FROM danmaku WHERE iphash = ? AND created > ?", iphash, now - 6e4).one().n;
+      if (recent >= 6) return json3({ error: "发送太快，稍等一下", retryAfter: 60 }, 429);
+    }
     const id = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
     this.sql.exec(
       `INSERT INTO danmaku (id, text, color, size, created, iphash, hidden, ip, bfp, dfp)
@@ -2692,8 +2750,12 @@ var Vault = class {
     }
     const iphash = clean(body.iphash, 64);
     const now = Date.now();
-    const recent = this.sql.exec("SELECT COUNT(*) AS n FROM uploads WHERE iphash = ? AND created > ?", iphash, now - 36e5).one().n;
-    if (recent >= 8) return json3({ error: "上传太频繁，一小时后再试" }, 429);
+    if (!body.skipLimit) {
+      const recent = this.sql.exec("SELECT COUNT(*) AS n FROM uploads WHERE iphash = ? AND created > ?", iphash, now - 36e5).one().n;
+      if (recent >= 30) {
+        return json3({ error: "上传太频繁，一小时后再试", retryAfter: Math.max(60, 3600 - Math.floor((now - (this.sql.exec("SELECT MIN(created) AS t FROM uploads WHERE iphash = ? AND created > ?", iphash, now - 36e5).one().t || now)) / 1e3)) }, 429);
+      }
+    }
     this.sql.exec(
       `INSERT INTO uploads (id, mime, bytes, created, iphash, title, hidden, ip, bfp, dfp)
        VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`,
@@ -2750,9 +2812,9 @@ Object.assign(Vault.prototype, {
       return json3({ error: "该网络已被限制提交", blocked: true }, 403);
     }
     const now = Date.now();
-    if (ip) {
+    if (ip && !body.skipLimit) {
       const recent = this.sql.exec("SELECT COUNT(*) AS n FROM messages WHERE ip = ? AND created > ?", ip, now - 36e5).one().n;
-      if (recent >= 5) return json3({ error: "提交太频繁，一小时后再试" }, 429);
+      if (recent >= 10) return json3({ error: "提交太频繁，一小时后再试", retryAfter: 3600 }, 429);
     }
     const id = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
     let code = "";

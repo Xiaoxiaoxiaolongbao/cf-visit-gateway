@@ -176,6 +176,15 @@ export async function handleWallGet(env) {
 
 /* ------------------------------------------------------------ 发弹幕 */
 
+/** 站长（有效 passkey 会话或管理令牌）不受限流约束 */
+async function isOwner(request, url, cfg, env) {
+  try {
+    if (await isAuthed(request, url, cfg, env)) return true;
+    if (hasAdminToken(request, cfg)) return true;
+  } catch {}
+  return false;
+}
+
 export async function handleDanmakuPost(request, env, url, cfg) {
   if (!vault(env)) return json({ error: "留言未启用" }, 503);
 
@@ -189,7 +198,9 @@ export async function handleDanmakuPost(request, env, url, cfg) {
   const iphash = await sha256Hex(`${ip}|${cfg.apiSecret || ""}`);
 
   const fp = fingerprintsOf(request);
+  const skipLimit = await isOwner(request, url, cfg, env);
   const rec = await vaultRaw(env, "/danmaku", {
+    skipLimit,
     text: body.text,
     color: body.color,
     size: body.size,
@@ -200,7 +211,10 @@ export async function handleDanmakuPost(request, env, url, cfg) {
   });
   if (rec.status !== 200 || !rec.data || rec.data.error) {
     const code = rec.status === 403 ? 403 : rec.status === 429 ? 429 : 400;
-    return json({ error: (rec.data && rec.data.error) || "写入失败", blocked: code === 403 }, code);
+    return json(
+      { error: (rec.data && rec.data.error) || "写入失败", blocked: code === 403, retryAfter: rec.data && rec.data.retryAfter },
+      code,
+    );
   }
   return json({ ok: true, item: rec.data.item }, 201);
 }
@@ -271,12 +285,15 @@ export async function handleUploadPost(request, env, url, cfg) {
   if (buf.length > MAX_UPLOAD) return json({ error: "超过 10MB" }, 413);
 
   const kind = MAGIC.find((m) => m.test(buf));
-  if (!kind) return json({ error: "只接受 JPG / PNG / GIF / WebP" }, 415);
+  if (!kind) {
+    const head = [...buf.slice(0, 4)].map((b) => b.toString(16).padStart(2, "0")).join(" ");
+    return json({ error: `不支持这种图片格式（文件头 ${head}），请用 JPG / PNG / GIF / WebP` }, 415);
+  }
 
   // 像素炸弹：不看尺寸就会让看图的人浏览器吃满内存
   const dim = imageSize(buf);
-  if (dim && dim.w * dim.h > 40_000_000) {
-    return json({ error: `图片过大（${dim.w}x${dim.h}），请压缩到 4000 万像素以内` }, 413);
+  if (dim && dim.w * dim.h > 60_000_000) {
+    return json({ error: `图片过大（${dim.w}x${dim.h}），请压缩到 6000 万像素以内` }, 413);
   }
 
   const id = randomId(10);
@@ -289,7 +306,9 @@ export async function handleUploadPost(request, env, url, cfg) {
   const ip = request.headers.get("cf-connecting-ip") || "0.0.0.0";
   const iphash = await sha256Hex(`${ip}|${cfg.apiSecret || ""}`);
   const fp = fingerprintsOf(request);
+  const skipLimit = await isOwner(request, url, cfg, env);
   const rec = await vaultRaw(env, "/upload", {
+    skipLimit,
     id,
     mime: kind.mime,
     bytes: buf.length,
@@ -324,7 +343,9 @@ export async function handleMessagePost(request, env, url, cfg) {
   const iphash = await sha256Hex(`${ip}|${cfg.apiSecret || ""}`);
   const fp = fingerprintsOf(request);
 
+  const skipLimit = await isOwner(request, url, cfg, env);
   const rec = await vaultRaw(env, "/message", {
+    skipLimit,
     name: body.name,
     contact: body.contact,
     body: body.body,

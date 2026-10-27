@@ -215,10 +215,12 @@ export class Vault {
       return json({ error: "该网络已被限制发送，如有疑问可联系管理员", blocked: true }, 403);
     }
 
-    const recent = this.sql
-      .exec("SELECT COUNT(*) AS n FROM danmaku WHERE iphash = ? AND created > ?", iphash, now - 60000)
-      .one().n;
-    if (recent >= 3) return json({ error: "发送太快，稍等一下" }, 429);
+    if (!body.skipLimit) {
+      const recent = this.sql
+        .exec("SELECT COUNT(*) AS n FROM danmaku WHERE iphash = ? AND created > ?", iphash, now - 60000)
+        .one().n;
+      if (recent >= 6) return json({ error: "发送太快，稍等一下", retryAfter: 60 }, 429);
+    }
 
     const id = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
     this.sql.exec(
@@ -255,10 +257,14 @@ export class Vault {
 
     const iphash = clean(body.iphash, 64);
     const now = Date.now();
-    const recent = this.sql
-      .exec("SELECT COUNT(*) AS n FROM uploads WHERE iphash = ? AND created > ?", iphash, now - 3600000)
-      .one().n;
-    if (recent >= 8) return json({ error: "上传太频繁，一小时后再试" }, 429);
+    if (!body.skipLimit) {
+      const recent = this.sql
+        .exec("SELECT COUNT(*) AS n FROM uploads WHERE iphash = ? AND created > ?", iphash, now - 3600000)
+        .one().n;
+      if (recent >= 30) {
+        return json({ error: "上传太频繁，一小时后再试", retryAfter: Math.max(60, 3600 - Math.floor((now - (this.sql.exec("SELECT MIN(created) AS t FROM uploads WHERE iphash = ? AND created > ?", iphash, now - 3600000).one().t || now)) / 1000)) }, 429);
+      }
+    }
 
     this.sql.exec(
       `INSERT INTO uploads (id, mime, bytes, created, iphash, title, hidden, ip, bfp, dfp)
@@ -327,11 +333,11 @@ Object.assign(Vault.prototype, {
     }
 
     const now = Date.now();
-    if (ip) {
+    if (ip && !body.skipLimit) {
       const recent = this.sql
         .exec("SELECT COUNT(*) AS n FROM messages WHERE ip = ? AND created > ?", ip, now - 3600000)
         .one().n;
-      if (recent >= 5) return json({ error: "提交太频繁，一小时后再试" }, 429);
+      if (recent >= 10) return json({ error: "提交太频繁，一小时后再试", retryAfter: 3600 }, 429);
     }
 
     const id = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
