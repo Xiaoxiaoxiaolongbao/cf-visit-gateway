@@ -410,7 +410,7 @@ await it("会话接口不向匿名者泄露 passkey 明细（只回数量）", a
 });
 
 await it("上传：像素炸弹（30000x30000 PNG）被拒 413", async () => {
-  const png = Buffer.alloc(64);
+  const png = Buffer.alloc(2048); // ≥1KB，才能走到尺寸校验
   Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(png, 0);
   png.writeUInt32BE(30000, 16);
   png.writeUInt32BE(30000, 20);
@@ -445,7 +445,7 @@ await it("管理写接口拒绝跨站 Origin", async () => {
 
 
 await it("上传：WebP(VP8L) 声明超大尺寸同样被拒（换子格式不能绕过像素上限）", async () => {
-  const buf = Buffer.alloc(40);
+  const buf = Buffer.alloc(2048); // ≥1KB，才能走到尺寸校验
   buf.write("RIFF", 0, "ascii");
   buf.write("WEBP", 8, "ascii");
   buf.write("VP8L", 12, "ascii");
@@ -484,6 +484,31 @@ await it("未配置 API_SECRET 时拒绝签发管理会话", async () => {
     e,
   );
   assert.equal(res.status, 503, "空密钥应直接 503");
+});
+
+
+await it("上传：小于 1KB 的文件被拒（415）", async () => {
+  const e = env({ VAULT: vaultStub(() => ({ ok: true, item: { id: "x" } })), UPLOADS: kvStub() });
+  const tiny = Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    Buffer.alloc(512),
+  ]);
+  assert.ok(tiny.length < 1024);
+  const res = await call("/api/wall/upload", { method: "POST", headers: { "content-type": "image/png" }, body: tiny }, e);
+  assert.equal(res.status, 415);
+  assert.match((await res.json()).error, /小于 1KB/);
+});
+
+await it("上传：刚过 1KB 的图可以正常入库", async () => {
+  const kv = kvStub();
+  const e = env({ VAULT: vaultStub(() => ({ ok: true, item: { id: "ok" } })), UPLOADS: kv });
+  const png = Buffer.alloc(1200);
+  Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(png, 0);
+  png.writeUInt32BE(64, 16);
+  png.writeUInt32BE(64, 20);
+  const res = await call("/api/wall/upload", { method: "POST", headers: { "content-type": "image/png" }, body: png }, e);
+  assert.equal(res.status, 201);
+  assert.equal(kv.map.size, 1);
 });
 
 /* ------------------------------------------------------------------ 汇总 */

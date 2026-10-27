@@ -12,6 +12,8 @@ import ADMIN_HTML from "./admin.html";
 import { b64uEncode, b64uDecode, verifyRegistration, verifyAssertion } from "./webauthn.js";
 
 const MAX_UPLOAD = 10 * 1024 * 1024;
+/** 小于 1KB 的文件不当图片：既没内容，也基本是探针/垃圾 */
+const MIN_UPLOAD = 1024;
 const SESSION_TTL = 12 * 3600 * 1000;
 const CHALLENGE_TTL = 5 * 60 * 1000;
 const BOOTSTRAP_TTL = 30 * 60 * 1000;
@@ -282,6 +284,7 @@ export async function handleUploadPost(request, env, url, cfg) {
 
   const buf = new Uint8Array(await request.arrayBuffer());
   if (!buf.length) return json({ error: "空文件" }, 400);
+  if (buf.length < MIN_UPLOAD) return json({ error: "文件小于 1KB，不能上传" }, 415);
   if (buf.length > MAX_UPLOAD) return json({ error: "超过 10MB" }, 413);
 
   const kind = MAGIC.find((m) => m.test(buf));

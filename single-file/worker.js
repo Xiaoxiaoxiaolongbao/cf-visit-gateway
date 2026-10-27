@@ -642,7 +642,7 @@ var page_default = `<!DOCTYPE html>
       <input type="file" id="file-input" accept="image/jpeg,image/png,image/gif,image/webp">
       <span id="drop-text">点击选择，或把图片拖到这里（JPG / PNG / GIF / WebP）</span>
     </label>
-    <p class="upload-note">上传后会出现在上方「奶蛙中学风采 · 自主上传」里，任何人可见；管理员可在 /admin 删除。</p>
+    <p class="upload-note">支持 1KB – 10MB 的 JPG / PNG / GIF / WebP，上传后会出现在「奶蛙中学风采 · 自主上传」里；管理员可在 /admin 删除。</p>
   </section>
 
   <section class="msg-card">
@@ -1233,6 +1233,7 @@ var page_default = `<!DOCTYPE html>
 
       function askConfirm(file) {
         if (!file) return;
+        if (file.size < 1024) { say("文件小于 1KB，不能上传"); return; }
         if (file.size > 10 * 1024 * 1024) { say("超过 10MB，换小一点的"); return; }
         pending = file;
         if (!confirmBox) { upload(file); return; }
@@ -1270,6 +1271,7 @@ var page_default = `<!DOCTYPE html>
 
       function upload(file) {
         if (!file) return;
+        if (file.size < 1024) { say("文件小于 1KB，不能上传"); return; }
         if (file.size > 10 * 1024 * 1024) { say("超过 10MB，换小一点的"); return; }
         say("正在上传 " + Math.round(file.size / 1024) + " KB…");
         fetch("/api/wall/upload", {
@@ -1630,6 +1632,7 @@ async function verifyAssertion({ payload, challenge, origin, rpId, jwk, alg, sto
 
 // src/wall.js
 var MAX_UPLOAD = 10 * 1024 * 1024;
+var MIN_UPLOAD = 1024;
 var SESSION_TTL = 12 * 3600 * 1e3;
 var CHALLENGE_TTL = 5 * 60 * 1e3;
 var BOOTSTRAP_TTL = 30 * 60 * 1e3;
@@ -1850,6 +1853,7 @@ async function handleUploadPost(request, env, url, cfg) {
   if (declared > MAX_UPLOAD) return json({ error: "超过 10MB" }, 413);
   const buf = new Uint8Array(await request.arrayBuffer());
   if (!buf.length) return json({ error: "空文件" }, 400);
+  if (buf.length < MIN_UPLOAD) return json({ error: "文件小于 1KB，不能上传" }, 415);
   if (buf.length > MAX_UPLOAD) return json({ error: "超过 10MB" }, 413);
   const kind = MAGIC.find((m) => m.test(buf));
   if (!kind) {
@@ -2675,7 +2679,7 @@ var Vault = class {
         case "/uploads": {
           const limit = Math.min(200, Math.max(1, Number(url.searchParams.get("limit")) || 60));
           const all = url.searchParams.get("all") === "1";
-          const where = all ? "" : "WHERE hidden = 0";
+          const where = all ? "" : "WHERE hidden = 0 AND bytes >= 1024";
           const cols = all ? "id, mime, bytes, created, title, ip, bfp, dfp" : "id, mime, bytes, created, title";
           const items = this.sql.exec(`SELECT ${cols} FROM uploads ${where} ORDER BY created DESC LIMIT ?`, limit).toArray();
           return json3({ items });

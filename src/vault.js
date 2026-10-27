@@ -144,7 +144,8 @@ export class Vault {
         case "/uploads": {
           const limit = Math.min(200, Math.max(1, Number(url.searchParams.get("limit")) || 60));
           const all = url.searchParams.get("all") === "1";
-          const where = all ? "" : "WHERE hidden = 0";
+          // 公开列表额外过滤 < 1KB：旧数据里可能还有测试残留
+          const where = all ? "" : "WHERE hidden = 0 AND bytes >= 1024";
           const cols = all
             ? "id, mime, bytes, created, title, ip, bfp, dfp"
             : "id, mime, bytes, created, title";
