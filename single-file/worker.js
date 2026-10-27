@@ -528,7 +528,12 @@ var page_default = `<!DOCTYPE html>
   .lightbox-sub::after { content: ""; flex: 1; height: 1px; background: var(--hair); }
   .lightbox-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
   .lightbox-empty { margin: 2px 0 0; font-size: 11.5px; color: var(--ink-soft); letter-spacing: .02em; }
-  .lightbox-grid img { display: block; width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--hair); }
+  .lightbox-grid img,
+  .lightbox-grid a { display: block; width: 100%; }
+  .lightbox-grid img {
+    aspect-ratio: 4 / 3; height: auto; object-fit: cover; border-radius: 8px;
+    border: 1px solid var(--hair); background: var(--hover-fill);
+  }
   .lightbox-foot { margin: 20px 0 0; font-size: 11.5px; letter-spacing: .02em; color: var(--ink-soft); text-align: center; }
   @media (max-width: 520px) {
     .lightbox { padding: 14px; }
@@ -1070,12 +1075,20 @@ var page_default = `<!DOCTYPE html>
           img.alt = u.title || "自主上传的图片";
           img.loading = "lazy";
           img.decoding = "async";
-          // KV 最终一致：刚上传的图可能还没同步到本区，失败时带参数重试一次
+          // KV 最终一致：刚上传的图可能还没同步到本区，失败时带参数重试一次；
+          // 重试仍失败就整块移除，不把破图留在画廊里
           var retried = false;
           img.addEventListener("error", function () {
-            if (retried) return;
-            retried = true;
-            setTimeout(function () { img.src = "/img/" + u.id + "?r=1"; }, 1200);
+            if (!retried) {
+              retried = true;
+              setTimeout(function () { img.src = "/img/" + u.id + "?r=1"; }, 1200);
+              return;
+            }
+            a.remove();
+          });
+          // 退化图片（1x1 之类）不展示
+          img.addEventListener("load", function () {
+            if (img.naturalWidth < 16 || img.naturalHeight < 16) a.remove();
           });
           img.src = "/img/" + u.id;
           a.appendChild(img);
@@ -1844,6 +1857,9 @@ async function handleUploadPost(request, env, url, cfg) {
     return json({ error: `不支持这种图片格式（文件头 ${head}），请用 JPG / PNG / GIF / WebP` }, 415);
   }
   const dim = imageSize(buf);
+  if (dim && (dim.w < 16 || dim.h < 16)) {
+    return json({ error: `图片太小（${dim.w}x${dim.h}），至少 16x16` }, 415);
+  }
   if (dim && dim.w * dim.h > 6e7) {
     return json({ error: `图片过大（${dim.w}x${dim.h}），请压缩到 6000 万像素以内` }, 413);
   }

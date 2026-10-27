@@ -292,6 +292,9 @@ export async function handleUploadPost(request, env, url, cfg) {
 
   // 像素炸弹：不看尺寸就会让看图的人浏览器吃满内存
   const dim = imageSize(buf);
+  if (dim && (dim.w < 16 || dim.h < 16)) {
+    return json({ error: `图片太小（${dim.w}x${dim.h}），至少 16x16` }, 415);
+  }
   if (dim && dim.w * dim.h > 60_000_000) {
     return json({ error: `图片过大（${dim.w}x${dim.h}），请压缩到 6000 万像素以内` }, 413);
   }
