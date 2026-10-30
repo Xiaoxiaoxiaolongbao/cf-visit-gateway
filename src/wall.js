@@ -164,16 +164,21 @@ async function tokenUsable(env, request, cfg) {
 
 /* ------------------------------------------------------------ 公开读 */
 
-export async function handleWallGet(env) {
+/** 读取留言墙数据（HTML 内联与接口共用） */
+export async function readWall(env) {
   const [danmaku, uploads] = await Promise.all([
     vaultCall(env, "/danmaku?limit=80"),
     vaultCall(env, "/uploads?limit=60"),
   ]);
-  return json({
+  return {
     danmaku: (danmaku && danmaku.items) || [],
     uploads: (uploads && uploads.items) || [],
     enabled: Boolean(vault(env)),
-  });
+  };
+}
+
+export async function handleWallGet(env) {
+  return json(await readWall(env));
 }
 
 /* ------------------------------------------------------------ 发弹幕 */

@@ -29,6 +29,7 @@ import {
   handleAdminApi,
   handleMessagePost,
   handleMessageLookup,
+  readWall,
 } from "./wall.js";
 import NAIWA_BYTES from "../assets/naiwa.jpg";
 import GALLERY_1 from "../assets/gallery/1.jpg";
@@ -80,7 +81,7 @@ async function route(request, env, ctx) {
 
   const isMailHost = url.hostname.startsWith("mail.");
   if ((url.pathname === "/" || url.pathname === "/index.html") && isMailHost) return serveMailPage(cfg, url);
-  if (url.pathname === "/") return servePage(cfg);
+  if (url.pathname === "/") return servePage(cfg, env);
   if (url.pathname === "/index.html") return servePage(cfg);
   if (url.pathname === "/favicon.ico") return icon(FAVICON_ICO, "image/x-icon");
   if (url.pathname === "/favicon.png") return icon(FAVICON_PNG, "image/png");
@@ -192,10 +193,17 @@ function truthy(value) {
 /** 全站统一的 HSTS（一年 + 子域） */
 const HSTS = "max-age=31536000; includeSubDomains";
 
-async function servePage(cfg) {
+async function servePage(cfg, env) {
   const paths = await derivePaths(cfg.secret);
   const nonce = randomId(16);
   const token = await mintToken(cfg.secret, Date.now(), SIGN_WINDOW_S);
+
+  // 内联数据失败不影响页面：兜底成空列表，客户端仍会自己拉一次
+  let seed = { danmaku: [], uploads: [], enabled: false };
+  try {
+    seed = await readWall(env);
+  } catch {}
+
 
   const payload = JSON.stringify({
     t: cfg.target, // 目标地址
@@ -213,7 +221,14 @@ async function servePage(cfg) {
     .replaceAll("{{HOST}}", escapeHtml(cfg.host))
     .replaceAll("{{JUMP}}", escapeHtml(paths.action.g))
     .replaceAll("{{NONCE}}", nonce)
-    .replaceAll("{{CONFIG_JSON}}", payload);
+    .replaceAll("{{CONFIG_JSON}}", payload)
+    // 首屏数据内联：省掉一次 /api/wall 往返（中国网络 RTT 200–400ms）
+    .replaceAll(
+      "{{WALL_JSON}}",
+      JSON.stringify(seed)
+        .replace(/</g, "\\u003c")
+        .replace(/\u2028|\u2029/g, ""),
+    );
 
   return new Response(html, {
     headers: {

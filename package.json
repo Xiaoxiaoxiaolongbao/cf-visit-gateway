@@ -25,7 +25,8 @@
     "build:single": "node scripts/build-single.mjs",
     "kv:create": "wrangler kv namespace create VISITS",
     "secret:api": "wrangler secret put API_SECRET",
-    "secret:admin": "wrangler secret put ADMIN_TOKEN"
+    "secret:admin": "wrangler secret put ADMIN_TOKEN",
+    "cn:check": "node scripts/cn-check.mjs"
   },
   "devDependencies": {
     "esbuild": "^0.28.2",

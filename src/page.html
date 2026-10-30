@@ -711,6 +711,7 @@
   </nav>
 
 <script id="cfg" type="application/json" nonce="{{NONCE}}">{{CONFIG_JSON}}</script>
+  <script id="wall-seed" type="application/json" nonce="{{NONCE}}">{{WALL_JSON}}</script>
 <script nonce="{{NONCE}}">
   (function () {
     "use strict";
@@ -1297,7 +1298,19 @@
         });
       }
 
-      load();
+      // 首屏用内联数据直接渲染，省一次往返；之后再按 20 秒同步
+      (function useSeed() {
+        var el = document.getElementById("wall-seed");
+        if (!el) { load(); return; }
+        try {
+          var seed = JSON.parse(el.textContent || "{}");
+          addAll(seed.danmaku || []);
+          renderUploads(seed.uploads || []);
+          if (seed.enabled === false) say("留言尚未启用");
+        } catch (e) {
+          load();
+        }
+      })();
       timer = setInterval(load, 20000);
       window.addEventListener("pagehide", function () { if (timer) clearInterval(timer); });
     })();

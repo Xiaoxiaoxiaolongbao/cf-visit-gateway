@@ -407,7 +407,10 @@ test("页面与产物不泄露密钥：只有签名，没有密钥；CSP nonce �
   assert.ok(csp.includes("default-src 'none'"));
   assert.ok(csp.includes("frame-ancestors 'none'"));
   const nonce = /'nonce-([A-Za-z0-9_-]+)'/.exec(csp)[1];
-  assert.equal(site.html.split(`nonce="${nonce}"`).length - 1, 4, "style、pre-paint 主题脚本与两段业务脚本都要带 nonce");
+  // style + pre-paint 主题脚本 + cfg 数据 + wall-seed 内联数据 + 两段业务脚本 = 6 处
+  const nonceCount = site.html.split(`nonce="${nonce}"`).length - 1;
+  assert.ok(nonceCount >= 5, `带 nonce 的内联块应有 5 处以上，实际 ${nonceCount}`);
+  assert.ok(site.html.includes('id="wall-seed"'), "首屏应内联留言数据（省一次往返）");
   assert.equal(site.res.headers.get("referrer-policy"), "no-referrer");
 });
 

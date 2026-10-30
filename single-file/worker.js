@@ -741,6 +741,7 @@ var page_default = `<!DOCTYPE html>
   </nav>
 
 <script id="cfg" type="application/json" nonce="{{NONCE}}">{{CONFIG_JSON}}<\/script>
+  <script id="wall-seed" type="application/json" nonce="{{NONCE}}">{{WALL_JSON}}<\/script>
 <script nonce="{{NONCE}}">
   (function () {
     "use strict";
@@ -1327,7 +1328,19 @@ var page_default = `<!DOCTYPE html>
         });
       }
 
-      load();
+      // 首屏用内联数据直接渲染，省一次往返；之后再按 20 秒同步
+      (function useSeed() {
+        var el = document.getElementById("wall-seed");
+        if (!el) { load(); return; }
+        try {
+          var seed = JSON.parse(el.textContent || "{}");
+          addAll(seed.danmaku || []);
+          renderUploads(seed.uploads || []);
+          if (seed.enabled === false) say("留言尚未启用");
+        } catch (e) {
+          load();
+        }
+      })();
       timer = setInterval(load, 20000);
       window.addEventListener("pagehide", function () { if (timer) clearInterval(timer); });
     })();
@@ -1748,16 +1761,19 @@ async function tokenUsable(env, request, cfg) {
   const list = await vaultCall(env, "/passkeys") || { items: [] };
   return (list.items || []).length === 0;
 }
-async function handleWallGet(env) {
+async function readWall(env) {
   const [danmaku, uploads] = await Promise.all([
     vaultCall(env, "/danmaku?limit=80"),
     vaultCall(env, "/uploads?limit=60")
   ]);
-  return json({
+  return {
     danmaku: danmaku && danmaku.items || [],
     uploads: uploads && uploads.items || [],
     enabled: Boolean(vault(env))
-  });
+  };
+}
+async function handleWallGet(env) {
+  return json(await readWall(env));
 }
 async function isOwner(request, url, cfg, env) {
   try {
@@ -2900,7 +2916,7 @@ async function route(request, env, ctx) {
   const url = new URL(request.url);
   const isMailHost = url.hostname.startsWith("mail.");
   if ((url.pathname === "/" || url.pathname === "/index.html") && isMailHost) return serveMailPage(cfg, url);
-  if (url.pathname === "/") return servePage(cfg);
+  if (url.pathname === "/") return servePage(cfg, env);
   if (url.pathname === "/index.html") return servePage(cfg);
   if (url.pathname === "/favicon.ico") return icon(favicon_default, "image/x-icon");
   if (url.pathname === "/favicon.png") return icon(favicon_default2, "image/png");
@@ -2990,10 +3006,15 @@ function truthy(value) {
   return ["1", "true", "yes", "on"].includes(String(value ?? "").trim().toLowerCase());
 }
 var HSTS = "max-age=31536000; includeSubDomains";
-async function servePage(cfg) {
+async function servePage(cfg, env) {
   const paths = await derivePaths(cfg.secret);
   const nonce = randomId2(16);
   const token = await mintToken(cfg.secret, Date.now(), SIGN_WINDOW_S);
+  let seed = { danmaku: [], uploads: [], enabled: false };
+  try {
+    seed = await readWall(env);
+  } catch {
+  }
   const payload = JSON.stringify({
     t: cfg.target,
     // 目标地址
@@ -3009,7 +3030,10 @@ async function servePage(cfg) {
     k: token
     // 时间窗签名，非密钥
   }).replace(/</g, "\\u003c").replace(/\u2028|\u2029/g, "");
-  const html = page_default.replaceAll("{{TITLE}}", escapeHtml(cfg.title)).replaceAll("{{HOST}}", escapeHtml(cfg.host)).replaceAll("{{JUMP}}", escapeHtml(paths.action.g)).replaceAll("{{NONCE}}", nonce).replaceAll("{{CONFIG_JSON}}", payload);
+  const html = page_default.replaceAll("{{TITLE}}", escapeHtml(cfg.title)).replaceAll("{{HOST}}", escapeHtml(cfg.host)).replaceAll("{{JUMP}}", escapeHtml(paths.action.g)).replaceAll("{{NONCE}}", nonce).replaceAll("{{CONFIG_JSON}}", payload).replaceAll(
+    "{{WALL_JSON}}",
+    JSON.stringify(seed).replace(/</g, "\\u003c").replace(/\u2028|\u2029/g, "")
+  );
   return new Response(html, {
     headers: {
       "content-type": "text/html; charset=utf-8",
