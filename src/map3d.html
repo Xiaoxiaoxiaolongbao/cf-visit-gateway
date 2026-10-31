@@ -62,7 +62,19 @@
   .scale i{display:block; height:4px; border-left:1px solid #6a6a72; border-right:1px solid #6a6a72; border-bottom:1px solid #6a6a72; margin-top:3px}
   footer{flex:none; margin-top:8px; display:flex; justify-content:space-between; gap:14px; font-size:10.5px; color:#63636a}
   footer span:last-child{font-family:var(--mono); letter-spacing:.1em; text-transform:uppercase; font-size:9px}
-  @media (max-width:680px){ .hint{display:none} .card{left:12px; right:12px; width:auto} footer{display:none} }
+  @media (max-width:680px){
+    body{overflow:auto}
+    .wrap{height:auto; min-height:100%}
+    .hint{display:none}
+    .card{left:12px; right:12px; width:auto}
+    footer{display:none}
+    h1 small{display:none}
+    /* 舞台：4:3 且不超过 68vh；图例进入文档流，不再压住模型 */
+    main{flex:none; height:auto; aspect-ratio:4/3; max-height:68vh; display:flex; flex-direction:column}
+    canvas{flex:1; min-height:0}
+    .legend{position:static; order:2; margin:8px 0 0; padding:0 10px 10px; max-width:none}
+    .scale{top:8px; left:8px}
+  }
 </style>
 </head>
 <body>
@@ -105,15 +117,15 @@
   "use strict";
 
   var C = {
-    brick:   [126, 70, 56],
-    brickDk: [99, 54, 43],
-    stone:   [206, 198, 184],
-    brick2:  [104, 74, 62],
-    plasterA:[186, 182, 172],
-    plasterB:[164, 166, 168],
-    plasterC:[198, 192, 180],
-    glass:   [54, 70, 82],
-    glassDk: [36, 46, 56],
+    brick:   [138, 74, 58],   // 树人堂：砖红
+    brickDk: [104, 54, 42],
+    stone:   [212, 204, 190], // 石质基座与门廊
+    brick2:  [112, 78, 64],   // 品字楼 / 胡文虎楼：老砖
+    plasterA:[172, 168, 156], // 逸夫楼：暖灰
+    plasterB:[146, 152, 158], // 综合楼：冷灰
+    plasterC:[196, 190, 176], // 实验楼 / 求知楼：砂色
+    glass:   [74, 86, 96],
+    glassDk: [58, 68, 78],
     roof:    [72, 72, 77],
     roofDk:  [52, 52, 57],
     conc:    [108, 108, 114],
@@ -131,6 +143,55 @@
   }
   function L(pts) { return pts; }
 
+  /**
+   * 沿多边形每条立面生成窗格：按开间与层数铺小块凹窗。
+   * poly 为平面轮廓；floorH 层高；winH 窗高；bay 开间；inset 向内偏移。
+   */
+  function windowsOn(out, poly, o) {
+    var floorH = o.floorH || 3.9;
+    var floors = o.floors || 4;
+    var winH = o.winH || 1.7;
+    var bay = o.bay || 3.6;
+    var inset = o.inset == null ? 0.12 : o.inset;
+    var base = o.base || 0.9;
+    var color = o.color || C.glass;
+    for (var e = 0; e < poly.length; e += 1) {
+      var a = poly[e], b = poly[(e + 1) % poly.length];
+      var ex = b[0] - a[0], ez = b[1] - a[1];
+      var len = Math.hypot(ex, ez);
+      if (len < 3) continue;
+      var ux = ex / len, uz = ez / len;
+      var nx = uz, nz = -ux;               // 外法线
+      var count = Math.max(1, Math.floor(len / bay));
+      var span = len / count;
+      var w = Math.min(2.4, span * 0.62);
+      for (var i = 0; i < count; i += 1) {
+        var dc = (i + 0.5) * span;
+        var cxp = a[0] + ux * dc + nx * inset;
+        var czp = a[1] + uz * dc + nz * inset;
+        for (var f = 0; f < floors; f += 1) {
+          var y0 = base + f * floorH;
+          var y1 = y0 + winH;
+          out.push({
+            poly: [
+              [cxp - ux * (w / 2) - nx * 0.001, czp - uz * (w / 2)],
+              [cxp + ux * (w / 2), czp + uz * (w / 2)],
+              [cxp + ux * (w / 2), czp + uz * (w / 2)],
+              [cxp - ux * (w / 2), czp - uz * (w / 2)]
+            ],
+            quad: [
+              [cxp - ux * (w / 2), y0, czp - uz * (w / 2)],
+              [cxp + ux * (w / 2), y0, czp + uz * (w / 2)],
+              [cxp + ux * (w / 2), y1, czp + uz * (w / 2)],
+              [cxp - ux * (w / 2), y1, czp - uz * (w / 2)]
+            ],
+            color: color
+          });
+        }
+      }
+    }
+  }
+
   /* ==================================================================
      校园布局（米；x 向东，z 向南，y 向上；原点取老校区中轴）
      南侧临街校门 → 广场 → 树人堂（中轴）→ 北侧教学组团
@@ -146,7 +207,11 @@
     p.push({ poly: rect(0, 4.0, 10.0, 6.6), y0: 0, y1: 17.0, color: C.brick, roof: "hip", roofH: 4.4 });
     p.push({ poly: rect(0, 4.0, 5.0, 3.2), y0: 21.4, y1: 23.6, color: C.brickDk, roof: "hip", roofH: 2.2 });
     p.push({ poly: rect(0, 8.4, 15.0, 5.4), y0: 0, y1: 0.85, color: C.stone });
-    [-5.6, -1.9, 1.9, 5.6].forEach(function (x) { p.push({ poly: rect(x, 10.2, 0.95, 0.95), y0: 0.85, y1: 8.4, color: C.stone }); });
+    // 门廊侧墙（原来的四根细柱在 3D 里像栅栏，改为两片实体 + 中间门洞）
+    p.push({ poly: rect(-6.4, 10.2, 2.6, 5.0), y0: 0.85, y1: 8.4, color: C.stone });
+    p.push({ poly: rect(6.4, 10.2, 2.6, 5.0), y0: 0.85, y1: 8.4, color: C.stone });
+    // 檐口线（薄薄一圈石线，代替原来那块突兀的深色板）
+    p.push({ poly: rect(0, 6, 38.4, 31.2), y0: 10.9, y1: 11.25, color: C.stone });
     p.push({ poly: rect(0, 9.6, 15.4, 5.8), y0: 8.4, y1: 9.5, color: C.stone });
     p.push({ poly: rect(0, 12.2, 12.4, 1.2), y0: 0, y1: 0.55, color: C.stone });
     p.push({ poly: rect(0, 13.2, 12.4, 1.2), y0: 0, y1: 0.28, color: C.stone });
@@ -163,9 +228,8 @@
     var p = [];
     var parts = [[-34, -2, 12, 12], [-46, -2, 12, 12], [-40, -12, 12, 12]];
     parts.forEach(function (r) {
-      p.push({ poly: rect(r[0], r[1], r[2], r[3]), y0: 0, y1: 12.5, color: C.brick2, roof: "hip", roofH: 2.4, roofColor: C.roofDk });
-      p.push({ poly: rect(r[0], r[1], r[2] - 3, r[3] - 3), y0: 3.0, y1: 4.4, color: C.glassDk, inset: 0.05 });
-      p.push({ poly: rect(r[0], r[1], r[2] - 3, r[3] - 3), y0: 7.0, y1: 8.4, color: C.glassDk, inset: 0.05 });
+      p.push({ poly: rect(r[0], r[1], r[2], r[3]), y0: 0, y1: 13.5, color: C.brick2, roof: "hip", roofH: 1.9, roofColor: [124, 112, 104] });
+      windowsOn(p, rect(r[0], r[1], r[2], r[3]), { floors: 3, floorH: 4.2, base: 2.4, bay: 3.0, winH: 1.9, color: C.glassDk, inset: 0.16 });
     });
     B.push({
       id: "pinzi", name: "品字楼", en: "Pinzi Building", floors: "3F",
@@ -198,10 +262,7 @@
     p.push({ poly: rect(6, -53.2, 20, 5.0), y0: 0, y1: 11.0, color: C.plasterA });
     p.push({ poly: rect(6, -50.4, 22, 2.2), y0: 6.0, y1: 8.0, color: C.glass });
     p.push({ poly: rect(6, -49.2, 24, 3.0), y0: 11.0, y1: 11.6, color: C.roofDk });
-    for (var f = 0; f < 4; f += 1) {
-      var y0 = 3.0 + f * 4.1;
-      p.push({ poly: rect(6, -46, 30, 14), y0: y0, y1: y0 + 1.8, color: C.glass, inset: 0.06 });
-    }
+    windowsOn(p, rect(6, -46, 34, 18), { floors: 4, floorH: 4.1, base: 3.2, bay: 3.4, winH: 2.0, color: C.glass, inset: 0.16 });
     B.push({
       id: "yifu", name: "逸夫楼", en: "Yifu Building", floors: "5F",
       anchor: [6, 22.0, -46], center: [6, -46],
@@ -214,10 +275,7 @@
   (function () {
     var p = [];
     p.push({ poly: rect(52, -46, 24, 46), y0: 0, y1: 22.5, color: C.plasterB, roof: "flat", parapet: 1.1 });
-    for (var f = 0; f < 5; f += 1) {
-      var y0 = 3.4 + f * 3.9;
-      p.push({ poly: rect(52, -46, 20, 42), y0: y0, y1: y0 + 1.7, color: C.glassDk, inset: 0.06 });
-    }
+    windowsOn(p, rect(52, -46, 24, 46), { floors: 5, floorH: 3.9, base: 3.4, bay: 3.2, winH: 1.8, color: C.glassDk, inset: 0.16 });
     p.push({ poly: rect(52, -23.6, 10, 2.4), y0: 0, y1: 6.6, color: C.glass });
     p.push({ poly: rect(52, -22.2, 12, 2.8), y0: 6.6, y1: 7.2, color: C.roofDk });
     B.push({
@@ -232,10 +290,7 @@
   (function () {
     var p = [];
     p.push({ poly: rect(52, 6, 22, 30), y0: 0, y1: 19.0, color: C.plasterC, roof: "flat", parapet: 1.0 });
-    for (var f = 0; f < 4; f += 1) {
-      var y0 = 3.2 + f * 4.0;
-      p.push({ poly: rect(52, 6, 18, 26), y0: y0, y1: y0 + 1.8, color: C.glass, inset: 0.06 });
-    }
+    windowsOn(p, rect(52, 6, 22, 30), { floors: 4, floorH: 4.0, base: 3.2, bay: 3.5, winH: 2.0, color: C.glass, inset: 0.16 });
     p.push({ poly: rect(52, 21.6, 8, 2.2), y0: 0, y1: 6.2, color: C.glass });
     B.push({
       id: "shiyan", name: "实验楼", en: "Laboratory Building", floors: "5F",
@@ -249,10 +304,7 @@
   (function () {
     var p = [];
     p.push({ poly: rect(24, 22, 26, 16), y0: 0, y1: 16.0, color: C.plasterA, roof: "flat", parapet: 0.9 });
-    for (var f = 0; f < 3; f += 1) {
-      var y0 = 3.4 + f * 4.1;
-      p.push({ poly: rect(24, 22, 22, 12), y0: y0, y1: y0 + 1.8, color: C.glassDk, inset: 0.06 });
-    }
+    windowsOn(p, rect(24, 22, 26, 16), { floors: 3, floorH: 4.1, base: 3.4, bay: 3.4, winH: 2.0, color: C.glassDk, inset: 0.16 });
     p.push({ poly: rect(24, 14.4, 9, 2.2), y0: 0, y1: 6.0, color: C.glass });
     B.push({
       id: "zixing", name: "自省楼", en: "Zixing Building", floors: "4F",
@@ -266,10 +318,16 @@
   (function () {
     var p = [];
     var cx = -46, cz = -46;
-    p.push({ poly: rect(cx, cz, 44, 28), y0: 0, y1: 11.5, color: C.conc, roof: "barrel", roofH: 6.0 });
-    p.push({ poly: rect(cx, cz + 15.6, 20, 8), y0: 0, y1: 7.4, color: C.plasterB });
-    p.push({ poly: rect(cx, cz + 19.0, 16, 1.6), y0: 6.0, y1: 7.0, color: C.glass });
-    p.push({ poly: rect(cx, cz + 17.4, 22, 3.2), y0: 7.4, y1: 8.0, color: C.roofDk });
+    // 主体：11.5 m 高的大跨馆，四坡屋盖再起 5 m
+    p.push({ poly: rect(cx, cz, 44, 28), y0: 0, y1: 11.5, color: [102, 104, 110], roof: "hip", roofH: 5.2, roofColor: [128, 124, 118] });
+    // 四周檐口压线
+    p.push({ poly: rect(cx, cz, 45.2, 29.2), y0: 11.2, y1: 11.6, color: [138, 140, 146] });
+    // 南侧入口翼 + 玻璃门厅 + 雨棚
+    p.push({ poly: rect(cx, cz + 15.6, 22, 8), y0: 0, y1: 7.4, color: [116, 118, 124] });
+    p.push({ poly: rect(cx, cz + 19.0, 16, 1.6), y0: 0.9, y1: 6.6, color: [70, 84, 96] });
+    p.push({ poly: rect(cx, cz + 17.4, 24, 3.4), y0: 7.4, y1: 8.1, color: [92, 92, 98] });
+    // 北立面高窗
+    p.push({ poly: rect(cx, cz - 13.6, 26, 1.0), y0: 8.0, y1: 10.6, color: [70, 84, 96] });
     B.push({
       id: "gym", name: "体育馆", en: "Gymnasium", floors: "大跨单层",
       anchor: [cx, 18.5, cz], center: [cx, cz],
@@ -282,10 +340,7 @@
   (function () {
     var p = [];
     p.push({ poly: rect(-16, -46, 16, 40), y0: 0, y1: 21.0, color: C.dorm, roof: "flat", parapet: 0.8 });
-    for (var f = 0; f < 5; f += 1) {
-      var y0 = 3.2 + f * 3.9;
-      p.push({ poly: rect(-16, -46, 12, 36), y0: y0, y1: y0 + 1.5, color: C.glassDk, inset: 0.06 });
-    }
+    windowsOn(p, rect(-16, -46, 16, 40), { floors: 5, floorH: 3.9, base: 3.2, bay: 3.6, winH: 1.5, color: C.glassDk, inset: 0.16 });
     p.push({ poly: rect(-16, -25.6, 6, 2.0), y0: 0, y1: 5.6, color: C.glass });
     B.push({
       id: "dorm", name: "男生宿舍", en: "Boys' Dormitory", floors: "6F",
@@ -300,6 +355,7 @@
     // 联培求知楼：四层，L 形用两个盒体拼
     var qz = [];
     qz.push({ poly: rect(84, 4, 30, 16), y0: 0, y1: 15.5, color: C.plasterC, roof: "flat", parapet: 0.9 });
+    windowsOn(qz, rect(84, 4, 30, 16), { floors: 4, floorH: 3.9, base: 3.0, bay: 3.5, winH: 1.8, color: C.glass, inset: 0.16 });
     qz.push({ poly: rect(72, 18, 12, 14), y0: 0, y1: 15.5, color: C.plasterC, roof: "flat", parapet: 0.9 });
     qz.push({ poly: rect(84, -4.6, 12, 2.2), y0: 0, y1: 6.4, color: C.glass });
     qz.push({ poly: rect(84, -6.2, 14, 2.6), y0: 6.4, y1: 7.0, color: C.roofDk });
@@ -308,6 +364,7 @@
     // 联培英才楼：五层板式，小院北侧
     var yc = [];
     yc.push({ poly: rect(86, -32, 34, 16), y0: 0, y1: 19.0, color: C.plasterA, roof: "flat", parapet: 1.0 });
+    windowsOn(yc, rect(86, -32, 34, 16), { floors: 5, floorH: 3.9, base: 3.2, bay: 3.6, winH: 1.8, color: C.glassDk, inset: 0.16 });
     yc.push({ poly: rect(86, -24.2, 10, 2.2), y0: 0, y1: 6.4, color: C.glass });
     yc.push({ poly: rect(86, -32, 30, 12), y0: 3.4, y1: 5.2, color: C.glassDk, inset: 0.06 });
     yc.push({ poly: rect(86, -32, 30, 12), y0: 7.3, y1: 9.1, color: C.glassDk, inset: 0.06 });
@@ -330,7 +387,10 @@
 
   /* ---------------- 环境：地面、操场、道路、围墙、校门、树 ---------------- */
   var ENV = [];
-  ENV.push({ poly: [[-70, -74], [120, -74], [120, 62], [-70, 62]], y0: -0.4, y1: 0, color: C.ground, flat: true });
+  // 模型底板：一圈 3 m 外扩的台基，厚 1.2 m
+  ENV.push({ poly: [[-73, -77], [123, -77], [123, 65], [-73, 65]], y0: -1.3, y1: -0.2, color: C.conc });
+  ENV.push({ poly: [[-73, -77], [123, -77], [123, 65], [-73, 65]], y0: -0.2, y1: -0.02, color: [34, 35, 39], flat: true });
+  ENV.push({ poly: [[-70, -74], [120, -74], [120, 62], [-70, 62]], y0: -0.05, y1: 0, color: C.ground, flat: true });
   // 前广场（校门 — 树人堂）
   ENV.push({ poly: [[-14, 4], [14, 4], [14, 26], [-14, 26]], y0: 0, y1: 0.13, color: C.path, flat: true });
   // 中轴步道
@@ -344,21 +404,23 @@
   ENV.push({ poly: [[16, 40], [64, 40], [64, 58], [16, 58]], y0: 0, y1: 0.06, color: C.lawn, flat: true });
   // 操场（跑道近似多边形）
   (function track() {
-    var cx = -46, cz = 12, rx = 26, rz = 17, pts = [];
-    for (var i = 0; i < 32; i += 1) {
-      var a = (Math.PI * 2 * i) / 32;
-      pts.push([cx + Math.cos(a) * rx, cz + Math.sin(a) * rz]);
+    // 标准体育场轮廓：直道 + 两个半圆
+    var cx = -44, cz = 10, halfW = 15, r = 15;
+    function stadium(scale) {
+      var hw = halfW * scale, rr = r * scale, pts = [], steps = 14, i, a;
+      for (i = 0; i <= steps; i += 1) { a = -Math.PI / 2 + (Math.PI * i) / steps; pts.push([cx + hw + Math.cos(a) * 0 - rr * Math.sin(a) * 0 + rr * Math.cos(a - Math.PI / 2) * 0 + rr * Math.cos(-Math.PI / 2 + (Math.PI * i) / steps), cz + rr * Math.sin(-Math.PI / 2 + (Math.PI * i) / steps)]); }
+      // 用参数化重建：右半圆 → 下直道 → 左半圆 → 上直道
+      pts = [];
+      for (i = 0; i <= steps; i += 1) { a = -Math.PI / 2 + (Math.PI * i) / steps; pts.push([cx + hw + Math.cos(a) * rr, cz + Math.sin(a) * rr]); }
+      for (i = 0; i <= steps; i += 1) { a = Math.PI / 2 + (Math.PI * i) / steps; pts.push([cx - hw + Math.cos(a) * rr, cz + Math.sin(a) * rr]); }
+      return pts;
     }
-    ENV.push({ poly: pts, y0: 0, y1: 0.05, color: C.track, flat: true });
-    var inner = [];
-    for (var j = 0; j < 32; j += 1) {
-      var b = (Math.PI * 2 * j) / 32;
-      inner.push([cx + Math.cos(b) * (rx - 7), cz + Math.sin(b) * (rz - 6)]);
-    }
-    ENV.push({ poly: inner, y0: 0, y1: 0.07, color: C.lawn, flat: true });
+    ENV.push({ poly: stadium(1), y0: 0, y1: 0.05, color: C.track, flat: true });
+    ENV.push({ poly: stadium(0.72), y0: 0, y1: 0.08, color: C.lawn, flat: true });
   })();
   // 围墙
   ENV.push({ poly: [[-70, 60], [120, 60], [120, 62], [-70, 62]], y0: 0, y1: 2.2, color: C.conc });
+  ENV.push({ poly: [[-70.2, 59.8], [120.2, 59.8], [120.2, 62.2], [-70.2, 62.2]], y0: 2.2, y1: 2.5, color: C.stone });
   ENV.push({ poly: [[-70, -74], [-68, -74], [-68, 62], [-70, 62]], y0: 0, y1: 2.2, color: C.conc });
   ENV.push({ poly: [[118, -74], [120, -74], [120, 62], [118, 62]], y0: 0, y1: 2.2, color: C.conc });
   // 校门（南墙开洞 + 门柱 + 门房）
@@ -371,10 +433,11 @@
   ENV.push({ poly: rect(0, 34, 0.5, 0.5), y0: 0, y1: 16, color: C.stone });
 
   function tree(x, z, h, r) {
-    for (var i = 0; i < 3; i += 1) {
-      var yb = h * 0.32 * i, rr = r * (1 - i * 0.26);
-      ENV.push({ poly: rect(x, z, rr * 2, rr * 2), y0: yb, y1: yb + h * 0.4, color: C.tree, roof: "hip", roofH: h * 0.32 });
-    }
+    // 树干
+    ENV.push({ poly: rect(x, z, 0.9, 0.9), y0: 0, y1: h * 0.34, color: [58, 48, 42] });
+    // 两级树冠（下宽上尖）
+    ENV.push({ poly: rect(x, z, r * 2.2, r * 2.2), y0: h * 0.3, y1: h * 0.66, color: C.tree, roof: "hip", roofH: h * 0.26 });
+    ENV.push({ poly: rect(x, z, r * 1.3, r * 1.3), y0: h * 0.6, y1: h * 0.88, color: C.tree, roof: "hip", roofH: h * 0.3 });
   }
   [[-16, 10], [-18, 24], [16, 8], [18, 26], [-26, 44], [6, 48], [30, 44], [56, 44], [-60, 24], [-8, -30],
    [18, -30], [70, 14], [70, -16], [126, 20], [92, -44], [126, -48], [-30, -60], [24, -60], [100, 40], [60, 4]]
@@ -395,6 +458,7 @@
   }
 
   function build(part, owner) {
+    if (part.quad) { pushFace(part.quad, part.color, owner, 1.05); return; }
     var poly = part.poly, y0 = part.y0 || 0, y1 = part.y1, inset = part.inset || 0;
     if (part.flat) {
       var topF = poly.map(function (p) { return [p[0], y1, p[1]]; });
@@ -471,6 +535,22 @@
   });
   ENV.forEach(function (p) { build(p, "env"); });
 
+  /* 落地阴影：把每栋楼的首层轮廓稍微外扩，压在地面上（order 0.5） */
+  B.forEach(function (b) {
+    b.parts.forEach(function (p) {
+      if ((p.y0 || 0) > 0.5 || (p.y1 || 0) < 2.5 || p.flat) return;
+      var cx = 0, cz = 0;
+      p.poly.forEach(function (q) { cx += q[0]; cz += q[1]; });
+      cx /= p.poly.length; cz /= p.poly.length;
+      var grown = p.poly.map(function (q) {
+        var dx = q[0] - cx, dz = q[1] - cz;
+        var l = Math.hypot(dx, dz) || 1;
+        return [q[0] + (dx / l) * 1.6 + 1.4, q[1] + (dz / l) * 1.6 + 1.4];
+      });
+      pushFace(grown.map(function (q) { return [q[0], 0.03, q[1]]; }), [15, 16, 18], b.id, 0.5);
+    });
+  });
+
   /* ---------------- 渲染（正交投影 + 画家算法） ---------------- */
   var cv = document.getElementById("cv");
   var ctx = cv.getContext("2d", { alpha: false });
@@ -482,6 +562,47 @@
   var W = 1, H = 1, BASE = 3.0;
   var LIGHT = (function () { var v = [-0.42, 0.84, 0.34], l = Math.hypot(v[0], v[1], v[2]); return [v[0] / l, v[1] / l, v[2] / l]; })();
 
+  /** 场景包围盒（世界坐标），用于自动取景 */
+  var SCENE = (function () {
+    var minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity, maxY = 0;
+    FACES.forEach(function (f) {
+      f.v.forEach(function (p) {
+        minX = Math.min(minX, p[0]); maxX = Math.max(maxX, p[0]);
+        minZ = Math.min(minZ, p[2]); maxZ = Math.max(maxZ, p[2]);
+        maxY = Math.max(maxY, p[1]);
+      });
+    });
+    return { minX: minX, maxX: maxX, minZ: minZ, maxZ: maxZ, maxY: maxY,
+      cx: (minX + maxX) / 2, cz: (minZ + maxZ) / 2, spanX: maxX - minX, spanZ: maxZ - minZ };
+  })();
+
+  /** 让整个场景刚好铺满视口（留 6% 边距） */
+  function fitView() {
+    var cy = Math.cos(CAM.yaw), sy = Math.sin(CAM.yaw);
+    var cp = Math.cos(CAM.pitch), sp = Math.sin(CAM.pitch);
+    var minSx = Infinity, maxSx = -Infinity, minSy = Infinity, maxSy = -Infinity;
+    [0, 1].forEach(function (ix) {
+      [0, 1].forEach(function (iz) {
+        [0, 1].forEach(function (iy) {
+          var x = ix ? SCENE.maxX : SCENE.minX;
+          var z = iz ? SCENE.maxZ : SCENE.minZ;
+          var y = iy ? SCENE.maxY : 0;
+          var x1 = x * cy - z * sy;
+          var z1 = x * sy + z * cy;
+          var yv = y * cp - z1 * sp;
+          minSx = Math.min(minSx, x1); maxSx = Math.max(maxSx, x1);
+          minSy = Math.min(minSy, yv); maxSy = Math.max(maxSy, yv);
+        });
+      });
+    });
+    var spanX = Math.max(1, maxSx - minSx), spanY = Math.max(1, maxSy - minSy);
+    var s = Math.min((W * 0.94) / spanX, (H * 0.90) / spanY);
+    CAM.zoom = Math.max(0.3, Math.min(4, s / BASE));
+    CAM.tx = SCENE.cx;
+    CAM.tz = SCENE.cz;
+    CAM.ty = SCENE.maxY * 0.42;
+  }
+
   function resize() {
     var r = stage.getBoundingClientRect();
     W = Math.max(1, Math.round(r.width));
@@ -489,6 +610,7 @@
     cv.width = Math.round(W * DPR);
     cv.height = Math.round(H * DPR);
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    fitView();
   }
 
   function makeView() {
@@ -513,7 +635,9 @@
 
   function shade(base, n) {
     var d = n[0] * LIGHT[0] + n[1] * LIGHT[1] + n[2] * LIGHT[2];
-    var k = 0.44 + 0.56 * Math.max(0, d);
+    // 主光 + 反向补光，暗面不至于死黑
+    var fill = 0.18 * Math.max(0, -(n[0] * LIGHT[0] + n[2] * LIGHT[2]));
+    var k = 0.30 + 0.70 * Math.max(0, d) + fill;
     return "rgb(" + Math.round(Math.min(255, base[0] * k)) + "," + Math.round(Math.min(255, base[1] * k)) + "," + Math.round(Math.min(255, base[2] * k)) + ")";
   }
 
@@ -556,11 +680,19 @@
       else { ctx.strokeStyle = "rgba(0,0,0,.20)"; ctx.lineWidth = 0.55; ctx.stroke(); }
     }
 
+    var placed = [];
     for (i = 0; i < B.length; i += 1) {
       var b = B[i];
       if (!b.el) continue;
       var p = v.project(b.anchor);
-      if (!p) { b.el.style.opacity = "0"; continue; }
+      if (!p || p.x < -40 || p.x > W + 40 || p.y < -20 || p.y > H + 20) { b.el.style.opacity = "0"; continue; }
+      // 简单避让：与已放标签距离过近就隐藏，宁缺不叠
+      var clash = false;
+      for (var q2 = 0; q2 < placed.length; q2 += 1) {
+        if (Math.abs(placed[q2][0] - p.x) < 74 && Math.abs(placed[q2][1] - p.y) < 26) { clash = true; break; }
+      }
+      if (clash && PICKED !== b.id) { b.el.style.opacity = "0"; continue; }
+      placed.push([p.x, p.y]);
       b.el.style.left = p.x.toFixed(1) + "px";
       b.el.style.top = p.y.toFixed(1) + "px";
       b.el.style.opacity = "1";
@@ -654,8 +786,10 @@
     select(b.id);
   }
   function reset() {
-    CAM.yaw = -0.70; CAM.pitch = 0.58; CAM.zoom = 1.18; CAM.tx = 24; CAM.tz = -12; CAM.ty = 7;
+    CAM.yaw = -0.70; CAM.pitch = 0.58;
     autoRotate = true; select(null);
+    fitView();
+    draw();
   }
   window.addEventListener("keydown", function (e) {
     if (e.key === "Escape") select(null);
