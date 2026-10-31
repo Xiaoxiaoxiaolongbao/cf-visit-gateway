@@ -401,6 +401,9 @@ var page_default = `<!DOCTYPE html>
     animation: reveal 1s .44s var(--ease) both;
   }
   .gallery-entry:hover { border-color: var(--hair-strong); background: var(--hover-fill); }
+  a.gallery-entry { text-decoration: none; }
+  a.gallery-entry .gallery-chev { transition: transform .3s var(--ease); }
+  a.gallery-entry:hover .gallery-chev { transform: translateX(3px); }
   .gallery-entry:focus-visible { outline: 2px solid var(--hair-strong); outline-offset: 3px; }
   .gallery-kicker {
     flex: none; font-family: var(--mono); font-size: 9.5px; letter-spacing: .2em;
@@ -629,6 +632,12 @@ var page_default = `<!DOCTYPE html>
     </a>
     <p class="dest">{{HOST}}</p>
   </div>
+
+  <a class="gallery-entry model-entry" href="/3dmap">
+    <span class="gallery-kicker">Model</span>
+    <span class="gallery-title">扬州中学立体图<small>单击前往</small></span>
+    <svg class="gallery-chev" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+  </a>
 
   <button class="gallery-entry" type="button" id="gallery-open" aria-haspopup="dialog" aria-controls="lightbox">
     <span class="gallery-kicker">Gallery</span>
@@ -1423,6 +1432,719 @@ var page_default = `<!DOCTYPE html>
 
 // src/mail.html
 var mail_default = '<!DOCTYPE html>\n<html lang="zh-CN">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n<meta name="color-scheme" content="dark">\n<meta name="robots" content="noindex, nofollow">\n<meta name="referrer" content="no-referrer">\n<title>邮箱 · {{TITLE}}</title>\n<link rel="icon" href="/favicon.ico" sizes="any">\n<link rel="icon" type="image/png" href="/favicon.png" sizes="64x64">\n<style nonce="{{NONCE}}">\n  :root {\n    --paper: #f5f5f7; --ink: #8a8a8f; --ink-soft: #63636a;\n    --hair: rgba(255,255,255,.085); --hair-strong: rgba(255,255,255,.16);\n    --black: #050506; --ok: #3fa86a; --warn: #d8bb62;\n    --ease: cubic-bezier(.16,1,.3,1);\n    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;\n  }\n  *, *::before, *::after { box-sizing: border-box; }\n  body {\n    margin: 0; min-height: 100svh; background: var(--black); color: var(--paper);\n    display: flex; align-items: center; justify-content: center; padding: 48px 24px;\n    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue",\n                 "PingFang SC", "Microsoft YaHei", sans-serif;\n    font-size: 15px; line-height: 1.55; -webkit-font-smoothing: antialiased;\n  }\n  body::before {\n    content: ""; position: fixed; left: 50%; top: -18vh; width: 120vw; height: 90vh;\n    transform: translateX(-50%); pointer-events: none; z-index: 0;\n    background: radial-gradient(38% 34% at 42% 12%, rgba(255,255,255,.13), transparent 68%);\n  }\n  main { position: relative; z-index: 1; width: min(560px, 100%); }\n  .seam {\n    height: 1px; margin: 0 0 30px;\n    background: linear-gradient(90deg, transparent, var(--hair-strong) 22%, var(--hair-strong) 78%, transparent);\n  }\n  .kicker {\n    margin: 0 0 26px; font-family: var(--mono); font-size: 10.5px;\n    letter-spacing: .22em; text-transform: uppercase; color: var(--ink-soft);\n  }\n  h1 { margin: 0 0 6px; font-size: 30px; font-weight: 500; letter-spacing: -.03em; }\n  .sub { margin: 0 0 34px; font-size: 14px; color: var(--ink); }\n  .addr {\n    display: block; margin: 0 0 30px; padding: 16px 18px; border: 1px solid var(--hair);\n    border-radius: 10px; font-family: var(--mono); font-size: 13px; letter-spacing: .02em;\n    color: var(--paper); word-break: break-all;\n  }\n  .addr b { color: var(--ink-soft); font-weight: 400; }\n  .rows { list-style: none; margin: 0 0 30px; padding: 0; border-top: 1px solid var(--hair); }\n  .rows li {\n    display: flex; justify-content: space-between; gap: 14px; padding: 12px 0;\n    border-bottom: 1px solid var(--hair); font-size: 13px;\n  }\n  .rows span { color: var(--ink-soft); }\n  .rows em { font-style: normal; font-family: var(--mono); font-size: 12px; color: var(--paper); }\n  .rows em.on { color: var(--ok); }\n  .rows em.off { color: var(--warn); }\n  .actions { display: flex; flex-wrap: wrap; gap: 12px; }\n  .btn {\n    display: inline-flex; align-items: center; gap: 8px; padding: 11px 22px;\n    border-radius: 980px; text-decoration: none; font-size: 14px; font-weight: 500;\n    border: 1px solid var(--hair-strong); color: var(--paper);\n    transition: background-color .2s ease, border-color .2s ease;\n  }\n  .btn:hover { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.28); }\n  .btn.primary { background: var(--paper); color: #0a0a0c; border-color: var(--paper); }\n  .btn.primary:hover { background: #fff; }\n  .note {\n    margin: 34px 0 0; padding-top: 18px; border-top: 1px solid var(--hair);\n    font-size: 12px; line-height: 1.9; color: var(--ink-soft);\n  }\n  .note code { font-family: var(--mono); font-size: 11.5px; color: var(--ink); }\n  @media (max-width: 520px) {\n    h1 { font-size: 24px; }\n    .actions { flex-direction: column; align-items: stretch; }\n    .btn { justify-content: center; }\n  }\n</style>\n</head>\n<body>\n<main>\n  <div class="seam"></div>\n  <p class="kicker">Mail &middot; {{ZONE}}</p>\n\n  <h1>学校邮箱</h1>\n  <p class="sub">任何前缀都能收，邮件转发到你的常用邮箱。</p>\n\n  <code class="addr">*@{{ZONE}} <b>&rarr;</b> {{DEST}}</code>\n\n  <ul class="rows">\n    <li><span>收件（MX 记录）</span><em class="{{MX_CLASS}}">{{MX_TEXT}}</em></li>\n    <li><span>转发目标</span><em>{{DEST}}</em></li>\n    <li><span>发件</span><em class="off">需第三方代发</em></li>\n  </ul>\n\n  <div class="actions">\n    <a class="btn primary" href="https://mail.qq.com/" target="_blank" rel="noopener noreferrer">打开 QQ 邮箱</a>\n    <a class="btn" href="{{DASH_URL}}" target="_blank" rel="noopener noreferrer">Cloudflare 邮件路由</a>\n  </div>\n\n  <p class="note">\n    收件由 Cloudflare Email Routing 免费完成：在面板启用后，MX 会自动写入 DNS，\n    随后把目标地址加进「Destination addresses」并在邮箱里点一次确认链接即可。<br>\n    发件不由本域直接投递（Cloudflare 不提供邮箱账号与 IMAP/SMTP）；\n    想在 QQ 邮箱里以 <code>@{{ZONE}}</code> 的身份回信，可在 QQ 邮箱设置里添加「其他邮箱」并用其 SMTP 代发。\n  </p>\n</main>\n</body>\n</html>\n';
+
+// src/map3d.html
+var map3d_default = `<!DOCTYPE html>
+<html lang="zh-CN" data-theme="noir">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>扬州中学 · 立体图</title>
+<meta name="description" content="江苏省扬州中学校园三维体块示意：树人堂、品字楼、胡文虎楼、逸夫楼、体育馆、联培求知楼、联培英才楼、男生宿舍、自省楼、实验楼、综合楼">
+<meta name="color-scheme" content="dark">
+<style nonce="{{NONCE}}">
+  :root{
+    --paper:#f5f5f7; --ink:#050506; --ink-soft:#a1a1a6; --hair:#232326; --hair-strong:#3a3a3f;
+    --hover-fill:rgba(255,255,255,.055);
+    --mono:"SFMono-Regular",ui-monospace,"JetBrains Mono",Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    --ease:cubic-bezier(.16,1,.3,1);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--ink); color:var(--paper); font-family:var(--sans); -webkit-font-smoothing:antialiased; overflow:hidden}
+  .wrap{display:flex; flex-direction:column; height:100%; padding:clamp(14px,2.4vw,30px)}
+  header{flex:none; display:flex; align-items:flex-end; justify-content:space-between; gap:16px}
+  .kicker{font-family:var(--mono); font-size:9.5px; letter-spacing:.24em; text-transform:uppercase; color:var(--ink-soft); margin:0}
+  h1{margin:.26em 0 0; font-size:clamp(19px,3.1vw,28px); font-weight:600; letter-spacing:-.02em; line-height:1.16}
+  h1 small{display:block; font-size:11.5px; font-weight:400; color:var(--ink-soft); margin-top:.5em; line-height:1.6}
+  .back{flex:none; display:inline-flex; align-items:center; gap:8px; padding:9px 15px; border-radius:999px;
+    border:1px solid var(--hair-strong); color:var(--paper); text-decoration:none; font-size:12.5px;
+    transition:background-color .25s var(--ease), border-color .25s var(--ease)}
+  .back:hover{background:var(--hover-fill); border-color:#4d4d54}
+  main{position:relative; flex:1; min-height:0; margin-top:clamp(10px,1.8vw,20px); border:1px solid var(--hair);
+    border-radius:14px; overflow:hidden;
+    background:radial-gradient(120% 90% at 50% 0%,#111114 0%,#08080a 62%,#050506 100%)}
+  canvas{display:block; width:100%; height:100%; touch-action:none; cursor:grab}
+  canvas.dragging{cursor:grabbing}
+  .labels{position:absolute; inset:0; pointer-events:none}
+  .label{position:absolute; transform:translate(-50%,-100%); white-space:nowrap; pointer-events:auto; cursor:pointer;
+    font-family:var(--mono); font-size:9.5px; letter-spacing:.08em; color:#e9e9ee;
+    background:rgba(5,5,6,.74); border:1px solid var(--hair-strong); border-radius:5px; padding:2px 6px;
+    transition:border-color .2s, opacity .2s}
+  .label:hover{border-color:#6f6f78}
+  .label[data-sel="1"]{border-color:#8a8a94; color:#fff}
+  .legend{position:absolute; left:12px; bottom:12px; display:flex; flex-wrap:wrap; gap:6px; max-width:calc(100% - 24px)}
+  .chip{display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px; cursor:pointer;
+    border:1px solid var(--hair); background:rgba(5,5,6,.68); color:#e8e8ec; font:inherit; font-size:11px;
+    backdrop-filter:blur(6px); transition:border-color .2s, background-color .2s}
+  .chip:hover{border-color:var(--hair-strong); background:var(--hover-fill)}
+  .chip[aria-pressed="true"]{border-color:#7f7f88; background:rgba(255,255,255,.1)}
+  .dot{width:6px; height:6px; border-radius:2px; flex:none}
+  .hint{position:absolute; right:12px; bottom:12px; font-family:var(--mono); font-size:9px; letter-spacing:.14em;
+    text-transform:uppercase; color:#6e6e76; text-align:right; line-height:1.7}
+  .card{position:absolute; right:12px; top:12px; width:min(300px,calc(100% - 24px)); border:1px solid var(--hair-strong);
+    border-radius:12px; background:rgba(8,8,10,.92); backdrop-filter:blur(10px); padding:13px 14px;
+    opacity:0; transform:translateY(-6px); transition:opacity .26s var(--ease), transform .26s var(--ease); pointer-events:none}
+  .card.on{opacity:1; transform:none; pointer-events:auto}
+  .card h2{margin:0; font-size:13.5px; font-weight:600}
+  .card p{margin:7px 0 0; font-size:11.5px; line-height:1.7; color:#c9c9d0}
+  .card dl{margin:9px 0 0; display:grid; grid-template-columns:auto 1fr; gap:3px 10px; font-size:10.5px; color:#9b9ba3}
+  .card dt{font-family:var(--mono); letter-spacing:.1em; text-transform:uppercase; font-size:9px; color:#6e6e76}
+  .card dd{margin:0; color:#dcdce2}
+  .card .close{position:absolute; top:6px; right:8px; border:0; background:none; color:#8a8a92; font-size:16px; cursor:pointer; padding:4px}
+  .compass{position:absolute; right:14px; top:14px; width:30px; height:30px; opacity:.45; pointer-events:none}
+  .scale{position:absolute; left:12px; top:12px; font-family:var(--mono); font-size:8.5px; letter-spacing:.14em; color:#6a6a72; pointer-events:none}
+  .scale i{display:block; height:4px; border-left:1px solid #6a6a72; border-right:1px solid #6a6a72; border-bottom:1px solid #6a6a72; margin-top:3px}
+  footer{flex:none; margin-top:8px; display:flex; justify-content:space-between; gap:14px; font-size:10.5px; color:#63636a}
+  footer span:last-child{font-family:var(--mono); letter-spacing:.1em; text-transform:uppercase; font-size:9px}
+  @media (max-width:680px){ .hint{display:none} .card{left:12px; right:12px; width:auto} footer{display:none} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <p class="kicker">Yangzhou Middle School · Massing Model</p>
+      <h1>扬州中学 · 立体图<small>十一栋楼 · 树人堂为 OSM 实测轮廓，其余按校史与影像推拟</small></h1>
+    </div>
+    <a class="back" href="/">返回首页</a>
+  </header>
+
+  <main id="stage">
+    <canvas id="cv" aria-label="江苏省扬州中学校园三维体块示意图"></canvas>
+    <div class="labels" id="labels"></div>
+    <div class="scale">0 — 40 m<i style="width:56px"></i></div>
+    <svg class="compass" viewBox="0 0 40 40" aria-hidden="true">
+      <circle cx="20" cy="20" r="15" fill="none" stroke="#8a8a92" stroke-width="1"/>
+      <path d="M20 6 L24 22 L20 19 L16 22 Z" fill="#c9c9d0"/>
+      <path d="M20 34 L24 22 L20 25 L16 22 Z" fill="#4a4a52"/>
+    </svg>
+    <div class="legend" id="legend"></div>
+    <div class="hint">拖动旋转 · 滚轮缩放<br>双击复位</div>
+    <div class="card" id="card">
+      <button class="close" id="card-close" type="button" aria-label="关闭">×</button>
+      <h2 id="card-title"></h2>
+      <p id="card-body"></p>
+      <dl id="card-meta"></dl>
+    </div>
+  </main>
+
+  <footer>
+    <span>实测：树人堂（OSM way/310321694，37×30 m）与校园总轮廓；其余十栋按校史、影像与相邻关系推拟，精确位置以校方平面图为准。</span>
+    <span>No external assets · Canvas 2D</span>
+  </footer>
+</div>
+
+<script nonce="{{NONCE}}">
+(function () {
+  "use strict";
+
+  var C = {
+    brick:   [126, 70, 56],
+    brickDk: [99, 54, 43],
+    stone:   [206, 198, 184],
+    brick2:  [104, 74, 62],
+    plasterA:[186, 182, 172],
+    plasterB:[164, 166, 168],
+    plasterC:[198, 192, 180],
+    glass:   [54, 70, 82],
+    glassDk: [36, 46, 56],
+    roof:    [72, 72, 77],
+    roofDk:  [52, 52, 57],
+    conc:    [108, 108, 114],
+    dorm:    [160, 150, 138],
+    ground:  [24, 25, 28],
+    path:    [44, 45, 50],
+    lawn:    [34, 46, 36],
+    track:   [96, 46, 40],
+    tree:    [56, 76, 58]
+  };
+
+  function rect(cx, cz, w, d) {
+    var hw = w / 2, hd = d / 2;
+    return [[cx - hw, cz - hd], [cx + hw, cz - hd], [cx + hw, cz + hd], [cx - hw, cz + hd]];
+  }
+  function L(pts) { return pts; }
+
+  /* ==================================================================
+     校园布局（米；x 向东，z 向南，y 向上；原点取老校区中轴）
+     南侧临街校门 → 广场 → 树人堂（中轴）→ 北侧教学组团
+     ================================================================== */
+
+  var B = [];
+
+  /* 1. 树人堂：老校舍，中轴核心，砖砌 + 中央塔楼 + 四柱门廊 */
+  (function () {
+    var p = [];
+    // OSM 实测轮廓：37×30 m（way/310321694）
+    p.push({ poly: rect(0, -6, 37, 30), y0: 0, y1: 11, color: C.brick, roof: "hip", roofH: 3.6 });
+    p.push({ poly: rect(0, 4.0, 10.0, 6.6), y0: 0, y1: 17.0, color: C.brick, roof: "hip", roofH: 4.4 });
+    p.push({ poly: rect(0, 4.0, 5.0, 3.2), y0: 21.4, y1: 23.6, color: C.brickDk, roof: "hip", roofH: 2.2 });
+    p.push({ poly: rect(0, 8.4, 15.0, 5.4), y0: 0, y1: 0.85, color: C.stone });
+    [-5.6, -1.9, 1.9, 5.6].forEach(function (x) { p.push({ poly: rect(x, 10.2, 0.95, 0.95), y0: 0.85, y1: 8.4, color: C.stone }); });
+    p.push({ poly: rect(0, 9.6, 15.4, 5.8), y0: 8.4, y1: 9.5, color: C.stone });
+    p.push({ poly: rect(0, 12.2, 12.4, 1.2), y0: 0, y1: 0.55, color: C.stone });
+    p.push({ poly: rect(0, 13.2, 12.4, 1.2), y0: 0, y1: 0.28, color: C.stone });
+    B.push({
+      id: "shuren", name: "树人堂", en: "Shuren Hall", floors: "3F + 塔楼", real: true,
+      anchor: [0, 23.0, -6], center: [0, -6],
+      note: "1930 年代老校舍，砖砌主体、中央塔楼、四柱门廊，中轴对称。现作礼堂与报告厅使用（联培部结业仪式即在此举行）。",
+      parts: p, base: C.brick
+    });
+  })();
+
+  /* 2. 品字楼：三块相连呈“品”字平面，老教学楼（树人堂西侧） */
+  (function () {
+    var p = [];
+    var parts = [[-34, -2, 12, 12], [-46, -2, 12, 12], [-40, -12, 12, 12]];
+    parts.forEach(function (r) {
+      p.push({ poly: rect(r[0], r[1], r[2], r[3]), y0: 0, y1: 12.5, color: C.brick2, roof: "hip", roofH: 2.4, roofColor: C.roofDk });
+      p.push({ poly: rect(r[0], r[1], r[2] - 3, r[3] - 3), y0: 3.0, y1: 4.4, color: C.glassDk, inset: 0.05 });
+      p.push({ poly: rect(r[0], r[1], r[2] - 3, r[3] - 3), y0: 7.0, y1: 8.4, color: C.glassDk, inset: 0.05 });
+    });
+    B.push({
+      id: "pinzi", name: "品字楼", en: "Pinzi Building", floors: "3F",
+      anchor: [-40, 15.5, -2], center: [-40, -3],
+      note: "老教学楼群，平面由三个方楼咬合成“品”字，回廊相连。体块按“品”字形制复原其平面关系。",
+      parts: p, base: C.brick2
+    });
+  })();
+
+  /* 3. 胡文虎楼：华侨捐建老楼（树人堂东侧） */
+  (function () {
+    var p = [];
+    p.push({ poly: rect(40, -4, 26, 14), y0: 0, y1: 13.0, color: C.brick2, roof: "hip", roofH: 2.6, roofColor: C.roofDk });
+    p.push({ poly: rect(40, 2.6, 8.0, 3.4), y0: 0, y1: 14.6, color: C.brick2, roof: "hip", roofH: 2.6 });
+    p.push({ poly: rect(40, 3.4, 9.6, 1.0), y0: 0, y1: 0.6, color: C.stone });
+    [-2.6, 0, 2.6].forEach(function (x) { p.push({ poly: rect(40 + x, 4.0, 0.7, 0.7), y0: 0.6, y1: 7.4, color: C.stone }); });
+    p.push({ poly: rect(40, 4.4, 10.4, 1.6), y0: 7.4, y1: 8.2, color: C.stone });
+    B.push({
+      id: "huwenhu", name: "胡文虎楼", en: "Hu Wenhu Building", floors: "3F",
+      anchor: [40, 17.0, -4], center: [40, -4],
+      note: "华侨捐建的历史校舍之一，与树人堂同期形成老校区的东西两翼；立面以砖砌与石质门套为特征。",
+      parts: p, base: C.brick2
+    });
+  })();
+
+  /* 4. 逸夫楼：北部，体量较大（图书馆 / 报告厅） */
+  (function () {
+    var p = [];
+    p.push({ poly: rect(6, -46, 34, 18), y0: 0, y1: 19.5, color: C.plasterA, roof: "flat", parapet: 1.0 });
+    p.push({ poly: rect(6, -53.2, 20, 5.0), y0: 0, y1: 11.0, color: C.plasterA });
+    p.push({ poly: rect(6, -50.4, 22, 2.2), y0: 6.0, y1: 8.0, color: C.glass });
+    p.push({ poly: rect(6, -49.2, 24, 3.0), y0: 11.0, y1: 11.6, color: C.roofDk });
+    for (var f = 0; f < 4; f += 1) {
+      var y0 = 3.0 + f * 4.1;
+      p.push({ poly: rect(6, -46, 30, 14), y0: y0, y1: y0 + 1.8, color: C.glass, inset: 0.06 });
+    }
+    B.push({
+      id: "yifu", name: "逸夫楼", en: "Yifu Building", floors: "5F",
+      anchor: [6, 22.0, -46], center: [6, -46],
+      note: "邵逸夫捐建的较大体量楼，通常作图书馆、报告厅与专用教室；北向接次入口门厅。",
+      parts: p, base: C.plasterA
+    });
+  })();
+
+  /* 5. 综合楼：行政 + 综合，六层，校园北部偏东 */
+  (function () {
+    var p = [];
+    p.push({ poly: rect(52, -46, 24, 46), y0: 0, y1: 22.5, color: C.plasterB, roof: "flat", parapet: 1.1 });
+    for (var f = 0; f < 5; f += 1) {
+      var y0 = 3.4 + f * 3.9;
+      p.push({ poly: rect(52, -46, 20, 42), y0: y0, y1: y0 + 1.7, color: C.glassDk, inset: 0.06 });
+    }
+    p.push({ poly: rect(52, -23.6, 10, 2.4), y0: 0, y1: 6.6, color: C.glass });
+    p.push({ poly: rect(52, -22.2, 12, 2.8), y0: 6.6, y1: 7.2, color: C.roofDk });
+    B.push({
+      id: "zonghe", name: "综合楼", en: "Comprehensive Building", floors: "6F",
+      anchor: [52, 25.5, -46], center: [52, -46],
+      note: "校园里体量最高的综合楼：行政办公、教研与多功能教室混置，沿东侧围墙展开，北端与逸夫楼相邻。",
+      parts: p, base: C.plasterB
+    });
+  })();
+
+  /* 6. 实验楼：五层，东侧中部 */
+  (function () {
+    var p = [];
+    p.push({ poly: rect(52, 6, 22, 30), y0: 0, y1: 19.0, color: C.plasterC, roof: "flat", parapet: 1.0 });
+    for (var f = 0; f < 4; f += 1) {
+      var y0 = 3.2 + f * 4.0;
+      p.push({ poly: rect(52, 6, 18, 26), y0: y0, y1: y0 + 1.8, color: C.glass, inset: 0.06 });
+    }
+    p.push({ poly: rect(52, 21.6, 8, 2.2), y0: 0, y1: 6.2, color: C.glass });
+    B.push({
+      id: "shiyan", name: "实验楼", en: "Laboratory Building", floors: "5F",
+      anchor: [52, 22.0, 6], center: [52, 6],
+      note: "物理、化学、生物实验室集中布置，进深较大以容纳实验台与通风管井；与综合楼、自省楼围合成东侧内院。",
+      parts: p, base: C.plasterC
+    });
+  })();
+
+  /* 7. 自省楼：四层教学楼，东南 */
+  (function () {
+    var p = [];
+    p.push({ poly: rect(24, 22, 26, 16), y0: 0, y1: 16.0, color: C.plasterA, roof: "flat", parapet: 0.9 });
+    for (var f = 0; f < 3; f += 1) {
+      var y0 = 3.4 + f * 4.1;
+      p.push({ poly: rect(24, 22, 22, 12), y0: y0, y1: y0 + 1.8, color: C.glassDk, inset: 0.06 });
+    }
+    p.push({ poly: rect(24, 14.4, 9, 2.2), y0: 0, y1: 6.0, color: C.glass });
+    B.push({
+      id: "zixing", name: "自省楼", en: "Zixing Building", floors: "4F",
+      anchor: [24, 18.5, 22], center: [24, 22],
+      note: "普通教学楼，南向长立面开连续窗带；与实验楼、综合楼共同围合东侧院落。",
+      parts: p, base: C.plasterA
+    });
+  })();
+
+  /* 8. 体育馆：西北，筒形拱屋盖 */
+  (function () {
+    var p = [];
+    var cx = -46, cz = -46;
+    p.push({ poly: rect(cx, cz, 44, 28), y0: 0, y1: 11.5, color: C.conc, roof: "barrel", roofH: 6.0 });
+    p.push({ poly: rect(cx, cz + 15.6, 20, 8), y0: 0, y1: 7.4, color: C.plasterB });
+    p.push({ poly: rect(cx, cz + 19.0, 16, 1.6), y0: 6.0, y1: 7.0, color: C.glass });
+    p.push({ poly: rect(cx, cz + 17.4, 22, 3.2), y0: 7.4, y1: 8.0, color: C.roofDk });
+    B.push({
+      id: "gym", name: "体育馆", en: "Gymnasium", floors: "大跨单层",
+      anchor: [cx, 18.5, cz], center: [cx, cz],
+      note: "大跨度筒拱屋盖的综合馆，可布置篮球、排球与看台；南侧接低矮入口翼，北侧靠操场。",
+      parts: p, base: C.conc
+    });
+  })();
+
+  /* 9. 男生宿舍：东北生活区，六层板式 */
+  (function () {
+    var p = [];
+    p.push({ poly: rect(-16, -46, 16, 40), y0: 0, y1: 21.0, color: C.dorm, roof: "flat", parapet: 0.8 });
+    for (var f = 0; f < 5; f += 1) {
+      var y0 = 3.2 + f * 3.9;
+      p.push({ poly: rect(-16, -46, 12, 36), y0: y0, y1: y0 + 1.5, color: C.glassDk, inset: 0.06 });
+    }
+    p.push({ poly: rect(-16, -25.6, 6, 2.0), y0: 0, y1: 5.6, color: C.glass });
+    B.push({
+      id: "dorm", name: "男生宿舍", en: "Boys' Dormitory", floors: "6F",
+      anchor: [-16, 24.0, -46], center: [-16, -46],
+      note: "南北向板式宿舍楼，标准间沿走廊两侧；西侧靠体育馆，东侧临生活区道路。",
+      parts: p, base: C.dorm
+    });
+  })();
+
+  /* 10 + 11. 联培部：东侧独立小院（原汶河派出所，2024 年 7 月后翻修） */
+  (function () {
+    // 联培求知楼：四层，L 形用两个盒体拼
+    var qz = [];
+    qz.push({ poly: rect(84, 4, 30, 16), y0: 0, y1: 15.5, color: C.plasterC, roof: "flat", parapet: 0.9 });
+    qz.push({ poly: rect(72, 18, 12, 14), y0: 0, y1: 15.5, color: C.plasterC, roof: "flat", parapet: 0.9 });
+    qz.push({ poly: rect(84, -4.6, 12, 2.2), y0: 0, y1: 6.4, color: C.glass });
+    qz.push({ poly: rect(84, -6.2, 14, 2.6), y0: 6.4, y1: 7.0, color: C.roofDk });
+    qz.push({ poly: rect(90, 10, 6, 6), y0: 15.5, y1: 17.6, color: C.conc });
+
+    // 联培英才楼：五层板式，小院北侧
+    var yc = [];
+    yc.push({ poly: rect(86, -32, 34, 16), y0: 0, y1: 19.0, color: C.plasterA, roof: "flat", parapet: 1.0 });
+    yc.push({ poly: rect(86, -24.2, 10, 2.2), y0: 0, y1: 6.4, color: C.glass });
+    yc.push({ poly: rect(86, -32, 30, 12), y0: 3.4, y1: 5.2, color: C.glassDk, inset: 0.06 });
+    yc.push({ poly: rect(86, -32, 30, 12), y0: 7.3, y1: 9.1, color: C.glassDk, inset: 0.06 });
+    yc.push({ poly: rect(86, -32, 30, 12), y0: 11.2, y1: 13.0, color: C.glassDk, inset: 0.06 });
+    yc.push({ poly: rect(86, -32, 30, 12), y0: 15.1, y1: 16.9, color: C.glassDk, inset: 0.06 });
+
+    B.push({
+      id: "lianpei-qz", name: "联培求知楼", en: "Lianpei Qiuzhi", floors: "4F",
+      anchor: [84, 19.5, 4], center: [84, 6],
+      note: "联培部求知班教学楼，L 形围出小院；2024 年 7 月翻修后启用，浅色涂料 + 深色横向窗带。",
+      parts: qz, base: C.plasterC
+    });
+    B.push({
+      id: "lianpei-yc", name: "联培英才楼", en: "Lianpei Yingcai", floors: "5F",
+      anchor: [86, 23.0, -32], center: [86, -32],
+      note: "联培部英才班教学楼，五层板式，与求知楼围合出联培部小院；同属 2024 年翻修范围。",
+      parts: yc, base: C.plasterA
+    });
+  })();
+
+  /* ---------------- 环境：地面、操场、道路、围墙、校门、树 ---------------- */
+  var ENV = [];
+  ENV.push({ poly: [[-70, -74], [120, -74], [120, 62], [-70, 62]], y0: -0.4, y1: 0, color: C.ground, flat: true });
+  // 前广场（校门 — 树人堂）
+  ENV.push({ poly: [[-14, 4], [14, 4], [14, 26], [-14, 26]], y0: 0, y1: 0.13, color: C.path, flat: true });
+  // 中轴步道
+  ENV.push({ poly: [[-2.4, -14], [2.4, -14], [2.4, 4], [-2.4, 4]], y0: 0, y1: 0.1, color: C.path, flat: true });
+  // 东西主路
+  ENV.push({ poly: [[-70, 30], [92, 30], [92, 34], [-70, 34]], y0: 0, y1: 0.1, color: C.path, flat: true });
+  // 南北次路（东侧）
+  ENV.push({ poly: [[58, -70], [62, -70], [62, 30], [58, 30]], y0: 0, y1: 0.1, color: C.path, flat: true });
+  // 草坪两块
+  ENV.push({ poly: [[-60, 34], [-18, 34], [-18, 58], [-60, 58]], y0: 0, y1: 0.06, color: C.lawn, flat: true });
+  ENV.push({ poly: [[16, 40], [64, 40], [64, 58], [16, 58]], y0: 0, y1: 0.06, color: C.lawn, flat: true });
+  // 操场（跑道近似多边形）
+  (function track() {
+    var cx = -46, cz = 12, rx = 26, rz = 17, pts = [];
+    for (var i = 0; i < 32; i += 1) {
+      var a = (Math.PI * 2 * i) / 32;
+      pts.push([cx + Math.cos(a) * rx, cz + Math.sin(a) * rz]);
+    }
+    ENV.push({ poly: pts, y0: 0, y1: 0.05, color: C.track, flat: true });
+    var inner = [];
+    for (var j = 0; j < 32; j += 1) {
+      var b = (Math.PI * 2 * j) / 32;
+      inner.push([cx + Math.cos(b) * (rx - 7), cz + Math.sin(b) * (rz - 6)]);
+    }
+    ENV.push({ poly: inner, y0: 0, y1: 0.07, color: C.lawn, flat: true });
+  })();
+  // 围墙
+  ENV.push({ poly: [[-70, 60], [120, 60], [120, 62], [-70, 62]], y0: 0, y1: 2.2, color: C.conc });
+  ENV.push({ poly: [[-70, -74], [-68, -74], [-68, 62], [-70, 62]], y0: 0, y1: 2.2, color: C.conc });
+  ENV.push({ poly: [[118, -74], [120, -74], [120, 62], [118, 62]], y0: 0, y1: 2.2, color: C.conc });
+  // 校门（南墙开洞 + 门柱 + 门房）
+  ENV.push({ poly: [[-9, 60], [-9, 62], [9, 62], [9, 60]], y0: 0, y1: 0.02, color: C.path, flat: true });
+  [-10.5, 10.5].forEach(function (x) {
+    ENV.push({ poly: rect(x, 61, 1.6, 2.4), y0: 0, y1: 3.4, color: C.stone });
+  });
+  ENV.push({ poly: rect(16, 58, 6, 4), y0: 0, y1: 3.0, color: C.stone, roof: "flat" }); // 门房
+  // 旗杆
+  ENV.push({ poly: rect(0, 34, 0.5, 0.5), y0: 0, y1: 16, color: C.stone });
+
+  function tree(x, z, h, r) {
+    for (var i = 0; i < 3; i += 1) {
+      var yb = h * 0.32 * i, rr = r * (1 - i * 0.26);
+      ENV.push({ poly: rect(x, z, rr * 2, rr * 2), y0: yb, y1: yb + h * 0.4, color: C.tree, roof: "hip", roofH: h * 0.32 });
+    }
+  }
+  [[-16, 10], [-18, 24], [16, 8], [18, 26], [-26, 44], [6, 48], [30, 44], [56, 44], [-60, 24], [-8, -30],
+   [18, -30], [70, 14], [70, -16], [126, 20], [92, -44], [126, -48], [-30, -60], [24, -60], [100, 40], [60, 4]]
+    .forEach(function (p) { tree(p[0], p[1], 7.5, 2.6); });
+
+  /* ---------------- 几何展开 ---------------- */
+  function normal(a, b, c) {
+    var ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2];
+    var vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+    var nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+    var l = Math.hypot(nx, ny, nz) || 1;
+    return [nx / l, ny / l, nz / l];
+  }
+  var FACES = [];
+  function pushFace(verts, color, owner, order) {
+    if (verts.length < 3) return;
+    FACES.push({ v: verts, n: normal(verts[0], verts[1], verts[2]), c: color, owner: owner, o: order == null ? 1 : order });
+  }
+
+  function build(part, owner) {
+    var poly = part.poly, y0 = part.y0 || 0, y1 = part.y1, inset = part.inset || 0;
+    if (part.flat) {
+      var topF = poly.map(function (p) { return [p[0], y1, p[1]]; });
+      pushFace(topF.slice().reverse(), part.color, owner, 0);
+      return;
+    }
+    for (var i = 0; i < poly.length; i += 1) {
+      var a = poly[i], b = poly[(i + 1) % poly.length];
+      var ex = b[0] - a[0], ez = b[1] - a[1];
+      var len = Math.hypot(ex, ez) || 1;
+      var nx = ez / len, nz = -ex / len;
+      var ax = a[0] + nx * inset, az = a[1] + nz * inset;
+      var bx = b[0] + nx * inset, bz = b[1] + nz * inset;
+      pushFace([[ax, y0, az], [bx, y0, bz], [bx, y1, bz], [ax, y1, az]], part.color, owner);
+    }
+    if (part.roof === "hip") {
+      var cx = 0, cz = 0;
+      poly.forEach(function (p) { cx += p[0]; cz += p[1]; });
+      cx /= poly.length; cz /= poly.length;
+      var h = part.roofH || 3;
+      for (var j = 0; j < poly.length; j += 1) {
+        var p1 = poly[j], p2 = poly[(j + 1) % poly.length];
+        pushFace([[p1[0], y1, p1[1]], [p2[0], y1, p2[1]], [cx, y1 + h, cz]], part.roofColor || C.roof, owner);
+      }
+    } else if (part.roof === "barrel") {
+      var segs = 12, minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+      poly.forEach(function (p) {
+        minX = Math.min(minX, p[0]); maxX = Math.max(maxX, p[0]);
+        minZ = Math.min(minZ, p[1]); maxZ = Math.max(maxZ, p[1]);
+      });
+      var rH = part.roofH || 3;
+      for (var s = 0; s < segs; s += 1) {
+        var t0 = (Math.PI * s) / segs, t1 = (Math.PI * (s + 1)) / segs;
+        pushFace([
+          [minX, y1 + Math.sin(t0) * rH, minZ + (maxZ - minZ) * (0.5 - 0.5 * Math.cos(t0))],
+          [maxX, y1 + Math.sin(t0) * rH, minZ + (maxZ - minZ) * (0.5 - 0.5 * Math.cos(t0))],
+          [maxX, y1 + Math.sin(t1) * rH, minZ + (maxZ - minZ) * (0.5 - 0.5 * Math.cos(t1))],
+          [minX, y1 + Math.sin(t1) * rH, minZ + (maxZ - minZ) * (0.5 - 0.5 * Math.cos(t1))]
+        ], C.roof, owner);
+      }
+    } else {
+      pushFace(poly.map(function (p) { return [p[0], y1, p[1]]; }), part.roofColor || C.roofDk, owner);
+      if (part.parapet) {
+        var ph = part.parapet;
+        for (var k = 0; k < poly.length; k += 1) {
+          var q1 = poly[k], q2 = poly[(k + 1) % poly.length];
+          var eex = q2[0] - q1[0], eez = q2[1] - q1[1];
+          var l2 = Math.hypot(eex, eez) || 1;
+          var nnx = eez / l2, nnz = -eex / l2;
+          pushFace([
+            [q1[0], y1, q1[1]], [q2[0], y1, q2[1]],
+            [q2[0] + nnx * 0.3, y1 + ph, q2[1] + nnz * 0.3],
+            [q1[0] + nnx * 0.3, y1 + ph, q1[1] + nnz * 0.3]
+          ], part.color, owner);
+        }
+      }
+    }
+  }
+
+  B.forEach(function (b) {
+    b.parts.forEach(function (p) { build(p, b.id); });
+    var minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity, maxY = 0;
+    b.parts.forEach(function (p) {
+      p.poly.forEach(function (q) {
+        minX = Math.min(minX, q[0]); maxX = Math.max(maxX, q[0]);
+        minZ = Math.min(minZ, q[1]); maxZ = Math.max(maxZ, q[1]);
+      });
+      maxY = Math.max(maxY, p.y1 || 0);
+    });
+    b.box = { minX: minX, maxX: maxX, minZ: minZ, maxZ: maxZ };
+    b.center = [(minX + maxX) / 2, (minZ + maxZ) / 2];
+    b.maxY = maxY;
+    b.w = maxX - minX; b.d = maxZ - minZ;
+  });
+  ENV.forEach(function (p) { build(p, "env"); });
+
+  /* ---------------- 渲染（正交投影 + 画家算法） ---------------- */
+  var cv = document.getElementById("cv");
+  var ctx = cv.getContext("2d", { alpha: false });
+  var stage = document.getElementById("stage");
+  var labelBox = document.getElementById("labels");
+
+  var CAM = { yaw: -0.70, pitch: 0.58, zoom: 1.18, tx: 24, tz: -12, ty: 7 };
+  var DPR = Math.min(window.devicePixelRatio || 1, 2);
+  var W = 1, H = 1, BASE = 3.0;
+  var LIGHT = (function () { var v = [-0.42, 0.84, 0.34], l = Math.hypot(v[0], v[1], v[2]); return [v[0] / l, v[1] / l, v[2] / l]; })();
+
+  function resize() {
+    var r = stage.getBoundingClientRect();
+    W = Math.max(1, Math.round(r.width));
+    H = Math.max(1, Math.round(r.height));
+    cv.width = Math.round(W * DPR);
+    cv.height = Math.round(H * DPR);
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+
+  function makeView() {
+    var cy = Math.cos(CAM.yaw), sy = Math.sin(CAM.yaw);
+    var cp = Math.cos(CAM.pitch), sp = Math.sin(CAM.pitch);
+    var s = BASE * CAM.zoom;
+    return {
+      dir: [sy * cp, sp, cy * cp],
+      project: function (p) {
+        var x = p[0] - CAM.tx, y = p[1] - CAM.ty, z = p[2] - CAM.tz;
+        var x1 = x * cy - z * sy;
+        var z1 = x * sy + z * cy;
+        var yv = y * cp - z1 * sp;
+        var zv = y * sp + z1 * cp;
+        var sx = W / 2 + x1 * s;
+        var sy2 = H / 2 - yv * s;
+        if (!isFinite(sx) || !isFinite(sy2)) return null;
+        return { x: sx, y: sy2, z: zv };
+      }
+    };
+  }
+
+  function shade(base, n) {
+    var d = n[0] * LIGHT[0] + n[1] * LIGHT[1] + n[2] * LIGHT[2];
+    var k = 0.44 + 0.56 * Math.max(0, d);
+    return "rgb(" + Math.round(Math.min(255, base[0] * k)) + "," + Math.round(Math.min(255, base[1] * k)) + "," + Math.round(Math.min(255, base[2] * k)) + ")";
+  }
+
+  var projected = [], PICKED = null;
+
+  function draw() {
+    var v = makeView();
+    ctx.fillStyle = "#08080a";
+    ctx.fillRect(0, 0, W, H);
+
+    var list = [], i, j;
+    for (i = 0; i < FACES.length; i += 1) {
+      var f = FACES[i];
+      var dot = f.n[0] * v.dir[0] + f.n[1] * v.dir[1] + f.n[2] * v.dir[2];
+      if (dot <= 0.002) continue;
+      var pts = [];
+      var ok = true;
+      for (j = 0; j < f.v.length; j += 1) {
+        var q = v.project(f.v[j]);
+        if (!q) { ok = false; break; }
+        pts.push(q);
+      }
+      if (!ok) continue;
+      var depth = 0;
+      for (j = 0; j < pts.length; j += 1) depth += pts[j].z;
+      list.push({ pts: pts, depth: depth / pts.length, color: shade(f.c, f.n), owner: f.owner, o: f.o });
+    }
+    list.sort(function (a, b) { return a.o - b.o || a.depth - b.depth; });
+    projected = list;
+
+    for (var k = 0; k < list.length; k += 1) {
+      var it = list[k];
+      ctx.beginPath();
+      ctx.moveTo(it.pts[0].x, it.pts[0].y);
+      for (var m = 1; m < it.pts.length; m += 1) ctx.lineTo(it.pts[m].x, it.pts[m].y);
+      ctx.closePath();
+      ctx.fillStyle = it.color;
+      ctx.fill();
+      if (PICKED && it.owner === PICKED) { ctx.strokeStyle = "rgba(245,245,247,.6)"; ctx.lineWidth = 1.3; ctx.stroke(); }
+      else { ctx.strokeStyle = "rgba(0,0,0,.20)"; ctx.lineWidth = 0.55; ctx.stroke(); }
+    }
+
+    for (i = 0; i < B.length; i += 1) {
+      var b = B[i];
+      if (!b.el) continue;
+      var p = v.project(b.anchor);
+      if (!p) { b.el.style.opacity = "0"; continue; }
+      b.el.style.left = p.x.toFixed(1) + "px";
+      b.el.style.top = p.y.toFixed(1) + "px";
+      b.el.style.opacity = "1";
+    }
+  }
+
+  /* ---------------- 交互 ---------------- */
+  function pointInPoly(x, y, pts) {
+    var inside = false;
+    for (var i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+      var xi = pts[i].x, yi = pts[i].y, xj = pts[j].x, yj = pts[j].y;
+      if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+    }
+    return inside;
+  }
+  function pick(mx, my) {
+    for (var i = projected.length - 1; i >= 0; i -= 1) {
+      if (projected[i].owner === "env") continue;
+      if (pointInPoly(mx, my, projected[i].pts)) return projected[i].owner;
+    }
+    return null;
+  }
+
+  var dragging = false, lastX = 0, lastY = 0, moved = 0, autoRotate = true, pinch = null;
+
+  cv.addEventListener("pointerdown", function (e) {
+    dragging = true; moved = 0; lastX = e.clientX; lastY = e.clientY;
+    cv.setPointerCapture(e.pointerId); cv.classList.add("dragging");
+  });
+  cv.addEventListener("pointermove", function (e) {
+    if (!dragging) return;
+    var dx = e.clientX - lastX, dy = e.clientY - lastY;
+    lastX = e.clientX; lastY = e.clientY;
+    moved += Math.abs(dx) + Math.abs(dy);
+    if (moved > 4) autoRotate = false;
+    CAM.yaw -= dx * 0.006;
+    CAM.pitch = Math.min(1.2, Math.max(0.16, CAM.pitch + dy * 0.004));
+    draw();
+  });
+  cv.addEventListener("pointerup", function (e) {
+    dragging = false; cv.classList.remove("dragging");
+    if (moved <= 4) {
+      var r = cv.getBoundingClientRect();
+      select(pick(e.clientX - r.left, e.clientY - r.top));
+    }
+  });
+  cv.addEventListener("pointercancel", function () { dragging = false; cv.classList.remove("dragging"); });
+  cv.addEventListener("wheel", function (e) {
+    e.preventDefault(); autoRotate = false;
+    CAM.zoom = Math.min(3.6, Math.max(0.4, CAM.zoom * (e.deltaY > 0 ? 0.92 : 1.08)));
+    draw();
+  }, { passive: false });
+  cv.addEventListener("dblclick", reset);
+
+  /* 信息卡 */
+  var card = document.getElementById("card");
+  var CHIPS = [];
+  function select(id) {
+    PICKED = id;
+    var b = null;
+    for (var i = 0; i < B.length; i += 1) if (B[i].id === id) b = B[i];
+    if (b) {
+      document.getElementById("card-title").textContent = b.name + " · " + b.en;
+      document.getElementById("card-body").textContent = b.note;
+      var dl = document.getElementById("card-meta");
+      dl.innerHTML = "";
+      [
+        ["层数", b.floors],
+        [(b.real ? "实测体量" : "推拟体量"), Math.round(b.w) + " × " + Math.round(b.d) + " m"],
+        ["檐高", Math.round(b.maxY) + " m"],
+        ["数据来源", b.real ? "OSM 实测轮廓" : "依校史与影像推拟"]
+      ].forEach(function (row) {
+        var dt = document.createElement("dt"); dt.textContent = row[0];
+        var dd = document.createElement("dd"); dd.textContent = row[1];
+        dl.appendChild(dt); dl.appendChild(dd);
+      });
+      card.classList.add("on");
+    } else {
+      card.classList.remove("on");
+    }
+    CHIPS.forEach(function (c) { c.el.setAttribute("aria-pressed", c.id === id ? "true" : "false"); });
+    for (var k = 0; k < B.length; k += 1) if (B[k].el) B[k].el.setAttribute("data-sel", B[k].id === id ? "1" : "0");
+    draw();
+  }
+  document.getElementById("card-close").addEventListener("click", function () { select(null); });
+
+  function focus(b) {
+    CAM.tx = b.center[0]; CAM.tz = b.center[1]; CAM.ty = b.maxY * 0.5;
+    CAM.zoom = Math.max(1.1, Math.min(2.4, 46 / Math.max(b.w, b.d, 8)));
+    autoRotate = false;
+    select(b.id);
+  }
+  function reset() {
+    CAM.yaw = -0.70; CAM.pitch = 0.58; CAM.zoom = 1.18; CAM.tx = 24; CAM.tz = -12; CAM.ty = 7;
+    autoRotate = true; select(null);
+  }
+  window.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") select(null);
+    if (e.key === "r" || e.key === "R") reset();
+  });
+
+  /* 图例 */
+  var legend = document.getElementById("legend");
+  B.forEach(function (b) {
+    var el = document.createElement("button");
+    el.type = "button"; el.className = "chip"; el.setAttribute("aria-pressed", "false");
+    var dot = document.createElement("span");
+    dot.className = "dot";
+    dot.style.background = "rgb(" + (b.base || C.conc).join(",") + ")";
+    el.appendChild(dot);
+    el.appendChild(document.createTextNode(b.name));
+    el.addEventListener("click", function (e) { e.stopPropagation(); focus(b); });
+    legend.appendChild(el);
+    CHIPS.push({ id: b.id, el: el });
+  });
+
+  /* 3D 标签 */
+  B.forEach(function (b) {
+    var el = document.createElement("button");
+    el.type = "button"; el.className = "label"; el.textContent = b.name;
+    el.addEventListener("click", function (e) { e.stopPropagation(); focus(b); });
+    labelBox.appendChild(el);
+    b.el = el;
+  });
+
+  // 调试钩子：便于用 --dump-dom 核对几何是否真的进场景
+  window.__dbg = function () {
+    var per = {};
+    for (var i = 0; i < FACES.length; i += 1) per[FACES[i].owner] = (per[FACES[i].owner] || 0) + 1;
+    return {
+      buildings: B.map(function (b) { return { id: b.id, parts: b.parts.length, faces: per[b.id] || 0, c: [Math.round(b.center[0]), Math.round(b.center[1])] }; }),
+      totalFaces: FACES.length,
+      cam: { tx: CAM.tx, tz: CAM.tz, zoom: CAM.zoom, yaw: CAM.yaw }
+    };
+  };
+
+  resize();
+  window.addEventListener("resize", function () { resize(); draw(); });
+  (function loop() {
+    if (autoRotate) { CAM.yaw += 0.0011; draw(); }
+    requestAnimationFrame(loop);
+  })();
+  draw();
+})();
+<\/script>
+</body>
+</html>
+`;
 
 // src/admin.html
 var admin_default = '<!DOCTYPE html>\n<html lang="zh-CN">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n<meta name="color-scheme" content="dark">\n<meta name="robots" content="noindex, nofollow">\n<title>管理台 · 奶蛙中学</title>\n<link rel="icon" href="/favicon.ico" sizes="any">\n<style nonce="{{NONCE}}">\n  :root {\n    --bg: #050506; --fg: #f5f5f7; --ink: #8a8a8f; --soft: #63636a;\n    --hair: rgba(255,255,255,.09); --hair2: rgba(255,255,255,.18);\n    --ok: #3fa86a; --warn: #d8bb62; --err: #d98b86;\n    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;\n  }\n  *, *::before, *::after { box-sizing: border-box; }\n  body {\n    margin: 0; background: var(--bg); color: var(--fg); min-height: 100vh;\n    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Microsoft YaHei", sans-serif;\n    font-size: 14px; line-height: 1.65; -webkit-font-smoothing: antialiased;\n  }\n  .wrap { width: min(880px, 100%); margin: 0 auto; padding: 44px 24px 90px; }\n  .seam { height: 1px; background: linear-gradient(90deg, transparent, var(--hair2) 20%, var(--hair2) 80%, transparent); margin: 0 0 26px; }\n  .kicker { font-family: var(--mono); font-size: 10px; letter-spacing: .22em; text-transform: uppercase; color: var(--soft); margin: 0 0 18px; }\n  h1 { font-size: 26px; font-weight: 500; letter-spacing: -.02em; margin: 0 0 6px; }\n  .sub { color: var(--ink); margin: 0 0 26px; font-size: 13px; }\n  .card { border: 1px solid var(--hair); border-radius: 12px; padding: 20px; margin-bottom: 16px; }\n  .card h2 { font-size: 14px; font-weight: 500; margin: 0 0 14px; }\n\n  /* 三步向导 */\n  .steps { list-style: none; margin: 0; padding: 0; counter-reset: step; }\n  .steps li { position: relative; padding: 14px 0 14px 42px; border-bottom: 1px solid var(--hair); }\n  .steps li:last-child { border-bottom: 0; padding-bottom: 0; }\n  .steps li::before {\n    counter-increment: step; content: counter(step);\n    position: absolute; left: 0; top: 14px; width: 26px; height: 26px; border-radius: 50%;\n    display: flex; align-items: center; justify-content: center;\n    font-family: var(--mono); font-size: 11px; color: var(--soft);\n    border: 1px solid var(--hair2);\n  }\n  .steps li.done::before { content: "✓"; color: var(--ok); border-color: rgba(63,168,106,.5); }\n  .steps li.active::before { color: var(--fg); border-color: var(--fg); }\n  .steps b { display: block; font-weight: 500; font-size: 13.5px; margin-bottom: 8px; }\n  .steps .hint { color: var(--soft); font-size: 12px; margin: 6px 0 0; }\n  .next {\n    margin: 0 0 16px; padding: 11px 14px; border-radius: 10px;\n    background: rgba(255,255,255,.04); border: 1px solid var(--hair);\n    font-size: 12.5px; color: var(--fg); letter-spacing: .01em;\n  }\n  .next.done { border-color: rgba(63,168,106,.35); color: var(--ok); }\n  .next.act { border-color: var(--hair2); }\n  .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }\n  button {\n    font: inherit; font-size: 13px; padding: 9px 18px; border-radius: 980px; cursor: pointer;\n    border: 1px solid var(--hair2); background: transparent; color: var(--fg);\n    transition: background-color .2s ease, border-color .2s ease, opacity .2s ease;\n  }\n  button:hover:not(:disabled) { background: rgba(255,255,255,.06); }\n  button.primary { background: var(--fg); color: #0a0a0c; border-color: var(--fg); }\n  button.primary:hover:not(:disabled) { background: #fff; }\n  button.danger { border-color: rgba(217,139,134,.45); color: var(--err); }\n  button.danger:hover:not(:disabled) { background: rgba(217,139,134,.1); }\n  button:disabled { opacity: .4; cursor: not-allowed; }\n  input[type="text"], input[type="password"] {\n    font: inherit; font-size: 13px; padding: 9px 14px; border-radius: 9px; min-width: 250px;\n    border: 1px solid var(--hair2); background: rgba(255,255,255,.03); color: var(--fg);\n  }\n  input:focus { outline: 2px solid var(--hair2); outline-offset: 1px; }\n  .status { font-family: var(--mono); font-size: 11.5px; letter-spacing: .04em; margin: 14px 0 0; min-height: 18px; }\n  .status.ok { color: var(--ok); } .status.warn { color: var(--warn); } .status.err { color: var(--err); }\n  .warnbar {\n    border: 1px solid rgba(216,187,98,.35); background: rgba(216,187,98,.06); color: var(--warn);\n    border-radius: 10px; padding: 12px 14px; font-size: 12.5px; margin-bottom: 16px;\n  }\n  .tabs { display: flex; gap: 8px; margin: 0 0 14px; flex-wrap: wrap; align-items: center; }\n  .tabs button { padding: 7px 16px; font-size: 12.5px; }\n  .tabs button[aria-selected="true"] { background: rgba(255,255,255,.09); border-color: var(--hair2); }\n  .list { list-style: none; margin: 0; padding: 0; }\n  .list li { display: flex; gap: 14px; align-items: flex-start; padding: 12px 0; border-bottom: 1px solid var(--hair); }\n  .list li:last-child { border-bottom: 0; }\n  .meta { flex: 1; min-width: 0; }\n  .meta b { font-weight: 500; word-break: break-word; }\n  .meta span { display: block; font-family: var(--mono); font-size: 10.5px; color: var(--soft); letter-spacing: .04em; margin-top: 3px; }\n  .thumb { width: 64px; height: 64px; border-radius: 8px; object-fit: cover; border: 1px solid var(--hair); flex: none; }\n  .empty { color: var(--soft); font-size: 12.5px; padding: 10px 0; }\n  .hide { display: none !important; }\n\n  .msg-body {\n    margin: 8px 0 10px; padding: 10px 12px; border-radius: 9px; background: rgba(255,255,255,.03);\n    border: 1px solid var(--hair); font-size: 13px; line-height: 1.75; white-space: pre-wrap; word-break: break-word;\n  }\n  .reply-input {\n    width: 100%; min-height: 58px; padding: 9px 12px; border-radius: 9px; resize: vertical;\n    border: 1px solid var(--hair2); background: rgba(255,255,255,.03); color: var(--fg);\n    font: inherit; font-size: 13px; line-height: 1.7;\n  }\n  .reply-input:focus { outline: 2px solid var(--hair2); outline-offset: 1px; }\n  .msg-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }\n\n  /* 站内确认弹窗（替代原生 confirm） */\n  .ask { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; padding: 22px; }\n  .ask[hidden] { display: none; }\n  .ask-scrim { position: absolute; inset: 0; background: rgba(0, 0, 0, .72); }\n  .ask-panel {\n    position: relative; z-index: 1; width: min(420px, 100%); padding: 22px;\n    background: #101014; border: 1px solid var(--hair2); border-radius: 14px;\n    box-shadow: 0 40px 120px -40px rgba(0, 0, 0, .95);\n  }\n  .ask-kicker { margin: 0 0 10px; font-family: var(--mono); font-size: 9.5px; letter-spacing: .2em; text-transform: uppercase; color: var(--soft); }\n  .ask-panel h3 { margin: 0 0 10px; font-size: 15px; font-weight: 500; }\n  .ask-panel p { margin: 0 0 18px; font-size: 13px; line-height: 1.8; color: var(--ink); word-break: break-all; }\n  .ask-actions { display: flex; gap: 10px; justify-content: flex-end; }\n  .ask-actions button { font: inherit; font-size: 13px; padding: 9px 20px; border-radius: 980px; cursor: pointer; border: 1px solid var(--hair2); background: transparent; color: var(--fg); }\n  .ask-actions button:hover { background: rgba(255,255,255,.06); }\n  .ask-actions button.primary { background: var(--fg); color: #0a0a0c; border-color: var(--fg); }\n  .ask-actions button.primary:hover { background: #fff; }\n  .ask-actions button.danger { border-color: rgba(217,139,134,.45); color: var(--err); }\n  .ask-actions button.danger:hover { background: rgba(217,139,134,.1); }\n  .domain { font-family: var(--mono); font-size: 11.5px; color: var(--fg); }\n</style>\n</head>\n<body>\n<div class="wrap">\n  <div class="seam"></div>\n  <p class="kicker">Admin &middot; 奶蛙中学</p>\n  <h1>管理台</h1>\n  <p class="sub">按顺序做完两步，这台电脑就能用 passkey 一键进管理台。</p>\n\n  <div id="warnbar" class="warnbar hide"></div>\n\n  <section class="card" id="bind-card">\n    <h2>绑定这台电脑</h2>\n    <p class="next" id="next-action">正在读取状态…</p>\n    <ol class="steps">\n      <li id="step1" class="active">\n        <b>第 1 步 · 输入一次管理令牌</b>\n        <div class="row" id="token-row">\n          <input type="password" id="token-input" placeholder="管理令牌" autocomplete="off">\n          <button class="primary" id="btn-token" type="button">验证令牌</button>\n        </div>\n        <p class="hint" id="step1-hint">令牌在项目根目录的 .dev.vars 文件里，也等于 Worker 上配置的那个同名 Secret。只用于这次绑定。</p>\n      </li>\n      <li id="step2">\n        <b>第 2 步 · 添加这台电脑的 passkey</b>\n        <div class="row">\n          <button class="primary" id="btn-register" type="button">添加这台电脑的 passkey</button>\n          <button id="btn-login" type="button" class="hide">用已有的 passkey 登录</button>\n        </div>\n        <p class="hint" id="step2-hint">先完成第 1 步（输入令牌）才能绑定。</p>\n      </li>\n      <li id="step3">\n        <b>第 3 步 · 完成</b>\n        <p class="hint" id="step3-hint">绑好后，以后打开这个页面点一下就能进。</p>\n      </li>\n    </ol>\n    <p class="status" id="bind-status"></p>\n  </section>\n\n  <div class="ask" id="ask" hidden role="dialog" aria-modal="true" aria-labelledby="ask-title">\n    <div class="ask-scrim" data-ask="cancel"></div>\n    <div class="ask-panel">\n      <p class="ask-kicker">Confirm</p>\n      <h3 id="ask-title">确认</h3>\n      <p id="ask-body"></p>\n      <div class="ask-actions">\n        <button id="ask-cancel" type="button">取消</button>\n        <button id="ask-ok" class="primary danger" type="button">确认</button>\n      </div>\n    </div>\n  </div>\n\n  <section id="manage" class="hide">\n    <div class="tabs" role="tablist">\n      <button role="tab" aria-selected="true" data-tab="danmaku">弹幕</button>\n      <button role="tab" aria-selected="false" data-tab="uploads">图片</button>\n      <button role="tab" aria-selected="false" data-tab="keys">密钥</button>\n      <button role="tab" aria-selected="false" data-tab="messages">私信</button>\n      <button role="tab" aria-selected="false" data-tab="blocks">黑名单</button>\n      <button id="btn-logout" type="button" style="margin-left:auto">退出</button>\n    </div>\n    <div class="card">\n      <ul class="list" id="list"></ul>\n      <p class="empty hide" id="empty">这里还是空的。</p>\n      <p class="status" id="panel-status"></p>\n    </div>\n  </section>\n</div>\n\n<script nonce="{{NONCE}}">\n  "use strict";\n\n  const $ = (id) => document.getElementById(id);\n  const b64u = {\n    enc(buf) {\n      const b = new Uint8Array(buf);\n      let s = "";\n      for (let i = 0; i < b.length; i += 1) s += String.fromCharCode(b[i]);\n      return btoa(s).replace(/\\+/g, "-").replace(/\\//g, "_").replace(/=+$/, "");\n    },\n    dec(str) {\n      const s = String(str).replace(/-/g, "+").replace(/_/g, "/");\n      const bin = atob(s + (s.length % 4 ? "=".repeat(4 - (s.length % 4)) : ""));\n      const out = new Uint8Array(bin.length);\n      for (let i = 0; i < bin.length; i += 1) out[i] = bin.charCodeAt(i);\n      return out;\n    },\n  };\n\n  let state = { authed: false, passkeys: [], passkeyCount: 0, rpId: "", vault: false, uploads: false };\n  let tab = "danmaku";\n  let cache = { danmaku: [], uploads: [], blocks: [], messages: [] };\n\n  /** 站内确认弹窗，替代 window.confirm（返回 Promise<boolean>） */\n  function askConfirm(options) {\n    return new Promise((resolve) => {\n      const box = $("ask");\n      if (!box) return resolve(window.confirm(options.body || "确认？"));\n      $("ask-title").textContent = options.title || "确认";\n      $("ask-body").textContent = options.body || "";\n      const ok = $("ask-ok");\n      const cancel = $("ask-cancel");\n      ok.textContent = options.okLabel || "确认";\n      ok.className = "primary" + (options.danger === false ? "" : " danger");\n      box.hidden = false;\n      cancel.focus();\n\n      function done(value) {\n        box.hidden = true;\n        ok.removeEventListener("click", onOk);\n        cancel.removeEventListener("click", onCancel);\n        box.removeEventListener("click", onScrim);\n        document.removeEventListener("keydown", onKey);\n        resolve(value);\n      }\n      const onOk = () => done(true);\n      const onCancel = () => done(false);\n      const onScrim = (e) => {\n        if (e.target && e.target.nodeType === 1 && e.target.getAttribute("data-ask") === "cancel") done(false);\n      };\n      const onKey = (e) => {\n        if (e.key === "Escape") done(false);\n        if (e.key === "Enter") done(true);\n      };\n      ok.addEventListener("click", onOk);\n      cancel.addEventListener("click", onCancel);\n      box.addEventListener("click", onScrim);\n      document.addEventListener("keydown", onKey);\n    });\n  }\n\n  function say(id, text, kind) {\n    const el = $(id);\n    el.textContent = text || "";\n    el.className = "status" + (kind ? " " + kind : "");\n  }\n\n  function explain(err) {\n    const name = (err && err.name) || "";\n    if (name === "NotAllowedError") {\n      return "系统窗口被取消或超时了。再点一次；如果一直不弹出，先确认这台电脑设置过 Windows Hello（PIN / 指纹 / 人脸）。";\n    }\n    if (name === "SecurityError") {\n      return "域名不匹配：passkey 只能绑定当前域名（" + state.rpId + "）。别用 IP 或 *.workers.dev 地址访问。";\n    }\n    if (name === "InvalidStateError") {\n      return "这台设备已经注册过 passkey 了，直接点「用已有的 passkey 登录」。";\n    }\n    if (name === "NotSupportedError" || name === "ConstraintError") {\n      return "当前浏览器或系统不支持 passkey（需要 Windows Hello、Touch ID 或安全密钥）。";\n    }\n    if (name === "AbortError") return "操作被中断，重试一次。";\n    return (err && err.message) || String(err);\n  }\n\n  async function api(path, options) {\n    const res = await fetch("/admin/api" + path, {\n      method: (options && options.method) || "GET",\n      headers: { "content-type": "application/json" },\n      credentials: "same-origin",\n      body: options && options.body ? JSON.stringify(options.body) : undefined,\n    });\n    const data = await res.json().catch(() => ({}));\n    if (!res.ok) throw new Error(data.error || "HTTP " + res.status);\n    return data;\n  }\n\n  async function refresh() {\n    try {\n      state = await api("/session");\n    } catch (err) {\n      say("bind-status", "读取状态失败：" + explain(err), "err");\n      return;\n    }\n\n    const hasKey = (state.passkeyCount ?? state.passkeys.length) > 0;\n    const label = $("domain-label");\n    if (label) label.textContent = state.rpId || location.hostname;\n\n    $("bind-card").classList.toggle("hide", state.authed && hasKey);\n\n    // 有 passkey 之后，令牌这一步整体隐藏（不是置灰）\n    $("step1").classList.toggle("hide", hasKey);\n\n    // 单一出口：现在该做什么，只有这里算\n    const next = $("next-action");\n    if (state.authed && hasKey) {\n      next.textContent = "已登录。要给另一台设备绑定，点「再添加一个 passkey」。";\n      next.className = "next done";\n    } else if (!state.authed && hasKey) {\n      next.textContent = "这台电脑已有 passkey —— 点「用这台电脑的 passkey 登录」，确认一次即可进入。";\n      next.className = "next act";\n    } else if (!state.authed && !hasKey) {\n      next.textContent = "首次使用（系统里还没有任何 passkey）：粘一次性令牌完成引导，之后令牌自动失效。";\n      next.className = "next act";\n    } else {\n      next.textContent = "令牌已通过：点「添加这台电脑的 passkey」，在系统窗口里确认一次。";\n      next.className = "next act";\n    }\n\n    const step1 = $("step1");\n    step1.classList.toggle("done", state.authed);\n    step1.classList.toggle("active", !state.authed);\n    $("token-row").classList.toggle("hide", state.authed);\n    $("step1-hint").textContent = state.authed\n      ? "令牌已验证 ✓"\n      : "令牌在项目根目录的 .dev.vars 文件里，也等于 Worker 上配置的那个同名 Secret。只用于这次绑定。";\n\n    const step2 = $("step2");\n    step2.classList.toggle("done", hasKey);\n    step2.classList.toggle("active", state.authed && !hasKey);\n    $("btn-register").disabled = false;\n    $("btn-register").textContent = hasKey ? "再添加一个 passkey" : "添加这台电脑的 passkey";\n    $("btn-register").classList.toggle("primary", state.authed || hasKey);\n    $("btn-login").classList.toggle("primary", !state.authed && hasKey);\n    $("btn-login").classList.toggle("hide", !hasKey || state.authed);\n    if (!state.authed) {\n      $("step2-hint").textContent = "先完成第 1 步（输入令牌）才能绑定。";\n    } else if (hasKey) {\n      $("step2-hint").textContent = "已绑定 " + state.passkeys.length + " 个（域名 " + state.rpId + "），可以再给另一台设备绑一个。";\n    } else {\n      $("step2-hint").textContent = "现在可以绑定了。点按钮后系统会弹 Windows Hello / 指纹窗口，确认一次即可。绑定域名：" + state.rpId + "。";\n    }\n\n    $("step3").classList.toggle("done", hasKey);\n    $("step3-hint").textContent = hasKey\n      ? "完成。以后打开这个页面点一下就能进；令牌步骤已从本页移除。"\n      : "绑好后，以后打开这个页面点一下就能进。";\n\n    $("manage").classList.toggle("hide", !state.authed);\n\n    const warnings = [];\n    if (state.authed && !hasKey) warnings.push("这台电脑还没绑定 passkey（第 2 步）：当前只是令牌的临时会话，30 分钟内有效，建议顺手绑一下。");\n    if (state.vault === false) warnings.push("Vault 未绑定：弹幕与图片的增删不会落库，检查 wrangler.toml 的 VAULT 绑定。");\n    if (state.uploads === false) warnings.push("UPLOADS 未绑定：图片无法保存，检查 KV 绑定。");\n    const bar = $("warnbar");\n    bar.classList.toggle("hide", warnings.length === 0);\n    bar.textContent = warnings.join(" ");\n\n    if (state.authed) await loadList();\n  }\n\n  function credToJSON(cred) {\n    const r = cred.response;\n    const out = { id: cred.id };\n    if (r.attestationObject) {\n      out.response = { clientDataJSON: b64u.enc(r.clientDataJSON), attestationObject: b64u.enc(r.attestationObject) };\n    } else {\n      out.response = {\n        clientDataJSON: b64u.enc(r.clientDataJSON),\n        authenticatorData: b64u.enc(r.authenticatorData),\n        signature: b64u.enc(r.signature),\n        userHandle: r.userHandle ? b64u.enc(r.userHandle) : null,\n      };\n    }\n    return out;\n  }\n\n  let busy = false;\n\n  async function register(auto) {\n    if (busy) return;\n    if (!state.authed) {\n      say("bind-status", "还没验证令牌：先把令牌粘进第 1 步的输入框，点「验证令牌」，我会自动接着走这一步。", "warn");\n      const input = $("token-input");\n      if (input) input.focus();\n      return;\n    }\n    if (!window.PublicKeyCredential) {\n      say("bind-status", "这个浏览器不支持 passkey（需要较新的 Chrome / Edge / Safari）。", "err");\n      return;\n    }\n    busy = true;\n    say("bind-status", auto ? "令牌已通过，正在弹出系统验证窗口…" : "正在请求系统验证…", "warn");\n    try {\n      const opts = await api("/passkey/options", { method: "POST", body: { mode: "register" } });\n      const pk = opts.publicKey;\n      pk.challenge = b64u.dec(pk.challenge);\n      pk.user.id = b64u.dec(pk.user.id);\n      const cred = await navigator.credentials.create({ publicKey: pk });\n      if (!cred) throw new Error("系统没有返回凭据");\n      await api("/passkey/register", {\n        method: "POST",\n        body: { response: credToJSON(cred).response, name: navigator.userAgent.slice(0, 40) },\n      });\n      say("bind-status", "绑定成功 ✓ 这台电脑以后可以直接登录", "ok");\n      await refresh();\n    } catch (err) {\n      say("bind-status", "绑定失败：" + explain(err), "err");\n    } finally {\n      busy = false;\n    }\n  }\n\n  async function login() {\n    say("bind-status", "正在请求系统验证…", "warn");\n    try {\n      const opts = await api("/passkey/options", { method: "POST", body: { mode: "login" } });\n      const pk = opts.publicKey;\n      pk.challenge = b64u.dec(pk.challenge);\n      pk.allowCredentials = (pk.allowCredentials || []).map((c) => ({ ...c, id: b64u.dec(c.id) }));\n      const cred = await navigator.credentials.get({ publicKey: pk });\n      if (!cred) throw new Error("系统没有返回凭据");\n      await api("/passkey/login", { method: "POST", body: { id: cred.id, response: credToJSON(cred).response } });\n      say("bind-status", "登录成功 ✓", "ok");\n      await refresh();\n    } catch (err) {\n      say("bind-status", "登录失败：" + explain(err), "err");\n    }\n  }\n\n  async function tokenLogin() {\n    const token = $("token-input").value.trim();\n    if (!token) return say("bind-status", "请先填入令牌", "warn");\n    say("bind-status", "正在验证令牌…", "warn");\n    try {\n      await api("/token", { method: "POST", body: { token } });\n      $("token-input").value = "";\n      say("bind-status", "令牌通过 ✓ 正在接着弹出系统验证窗口…", "ok");\n      await refresh();\n      // 用户刚点过按钮，仍处于用户激活期内，直接进入注册可以省掉第二次点击\n      await register(true);\n    } catch (err) {\n      say("bind-status", "令牌验证失败：" + explain(err), "err");\n    }\n  }\n\n  async function loadList() {\n    try {\n      const [data, blocked, msgs] = await Promise.all([\n        api("/list"),\n        api("/blocks").catch(() => ({ items: [] })),\n        api("/messages").catch(() => ({ items: [] })),\n      ]);\n      cache = {\n        danmaku: data.danmaku || [],\n        uploads: data.uploads || [],\n        blocks: blocked.items || [],\n        messages: msgs.items || [],\n      };\n      render();\n    } catch (err) {\n      say("panel-status", "读取失败：" + explain(err), "err");\n    }\n  }\n\n  function when(ts) {\n    return ts ? new Date(ts).toLocaleString("zh-CN", { hour12: false }) : "—";\n  }\n\n  function render() {\n    const list = $("list");\n    list.innerHTML = "";\n    let items = [];\n\n    if (tab === "messages") {\n      $("empty").classList.toggle("hide", cache.messages.length > 0);\n      for (const m of cache.messages) {\n        const li = document.createElement("li");\n        li.style.flexDirection = "column";\n        li.style.alignItems = "stretch";\n\n        const meta = document.createElement("div");\n        meta.className = "meta";\n        const b = document.createElement("b");\n        b.textContent = (m.name || "匿名") + (m.contact ? " · " + m.contact : "");\n        const sp = document.createElement("span");\n        sp.textContent =\n          when(m.created) + " · IP " + (m.ip || "—") +\n          (m.bfp ? " · 指纹 " + m.bfp + "/" + (m.dfp || "—") : "") +\n          (m.replied ? " · 已回复" : " · 待回复");\n        meta.append(b, sp);\n        li.appendChild(meta);\n\n        const body = document.createElement("div");\n        body.className = "msg-body";\n        body.textContent = m.body;\n        li.appendChild(body);\n\n        const ta = document.createElement("textarea");\n        ta.className = "reply-input";\n        ta.placeholder = "回复内容（会显示给留言者，最多 500 字）";\n        ta.maxLength = 500;\n        ta.value = m.reply || "";\n        li.appendChild(ta);\n\n        const actions = document.createElement("div");\n        actions.className = "msg-actions";\n        const send = document.createElement("button");\n        send.type = "button";\n        send.className = "primary";\n        send.textContent = m.replied ? "更新回复" : "回复";\n        send.addEventListener("click", async () => {\n          send.disabled = true;\n          try {\n            await api("/message/reply", { method: "POST", body: { id: m.id, reply: ta.value } });\n            say("panel-status", "回复已保存", "ok");\n            await refresh();\n          } catch (err) {\n            say("panel-status", "保存失败：" + explain(err), "err");\n            send.disabled = false;\n          }\n        });\n        actions.appendChild(send);\n\n        const drop = document.createElement("button");\n        drop.type = "button";\n        drop.className = "danger";\n        drop.textContent = "删除";\n        drop.addEventListener("click", async () => {\n          const ok = await askConfirm({\n            title: "删除这条私信？",\n            body: (m.name || "匿名") + "：" + String(m.body).slice(0, 60) + (String(m.body).length > 60 ? "…" : ""),\n            okLabel: "删除",\n          });\n          if (!ok) return;\n          drop.disabled = true;\n          try {\n            await api("/delete", { method: "POST", body: { kind: "message", id: m.id } });\n            say("panel-status", "已删除", "ok");\n            await refresh();\n          } catch (err) {\n            say("panel-status", "删除失败：" + explain(err), "err");\n            drop.disabled = false;\n          }\n        });\n        actions.appendChild(drop);\n\n        li.appendChild(actions);\n\n        list.appendChild(li);\n      }\n      return;\n    }\n\n    if (tab === "danmaku") {\n      items = cache.danmaku.map((d) => ({\n        kind: "danmaku",\n        id: d.id,\n        title: d.text,\n        meta: d.color + " · " + d.size + "px · " + when(d.created) + " · IP " + (d.ip || "—") +\n          (d.bfp ? " · 指纹 " + d.bfp + "/" + (d.dfp || "—") : ""),\n        ip: d.ip || "",\n      }));\n    } else if (tab === "uploads") {\n      items = cache.uploads.map((u) => ({\n        kind: "upload",\n        id: u.id,\n        title: u.title || u.id,\n        meta: u.mime + " · " + (u.bytes / 1024).toFixed(1) + " KB · " + when(u.created) +\n          " · IP " + (u.ip || "—") +\n          (u.bfp ? " · 指纹 " + u.bfp + "/" + (u.dfp || "—") : ""),\n        thumb: "/img/" + u.id,\n        ip: u.ip || "",\n      }));\n    } else if (tab === "blocks") {\n      items = cache.blocks.map((b) => ({\n        kind: "block",\n        id: b.ip,\n        title: b.ip,\n        meta: "加入于 " + when(b.created) + (b.reason ? " · " + b.reason : "") + " · 该 IP 无法上传图片与发送弹幕",\n      }));\n    } else {\n      items = state.passkeys.map((k) => ({ kind: "passkey", id: k.id, title: k.name || k.id.slice(0, 12), meta: "注册于 " + when(k.created) }));\n    }\n\n    $("empty").classList.toggle("hide", items.length > 0);\n\n    for (const item of items) {\n      const li = document.createElement("li");\n      if (item.thumb) {\n        const img = document.createElement("img");\n        img.className = "thumb";\n        img.src = item.thumb;\n        img.alt = "";\n        img.loading = "lazy";\n        li.appendChild(img);\n      }\n      const meta = document.createElement("div");\n      meta.className = "meta";\n      const b = document.createElement("b");\n      b.textContent = item.title;\n      const sp = document.createElement("span");\n      sp.textContent = item.meta;\n      meta.append(b, sp);\n      li.appendChild(meta);\n\n      const actions = [];\n\n      if (item.kind === "upload" && item.ip) {\n        actions.push({\n          label: "拉黑",\n          className: "",\n          onClick: async () => {\n            const ok = await askConfirm({\n              title: "拉黑这个 IP？",\n              body: item.ip + " —— 拉黑后该 IP 无法上传图片与发送弹幕，可在「黑名单」里解除。",\n              okLabel: "拉黑",\n            });\n            if (!ok) return;\n            await api("/block", { method: "POST", body: { ip: item.ip, reason: "手动拉黑" } });\n            say("panel-status", "已拉黑 " + item.ip, "ok");\n            await refresh();\n          },\n        });\n      }\n\n      if (item.kind === "block") {\n        actions.push({\n          label: "解除",\n          className: "",\n          onClick: async () => {\n            const ok = await askConfirm({\n              title: "解除这个 IP 的限制？",\n              body: item.ip + " —— 解除后该 IP 可以重新上传图片与发送弹幕。",\n              okLabel: "解除",\n              danger: false,\n            });\n            if (!ok) return;\n            await api("/unblock", { method: "POST", body: { ip: item.ip } });\n            say("panel-status", "已解除 " + item.ip, "ok");\n            await refresh();\n          },\n        });\n      }\n\n      for (const act of actions) {\n        const btn = document.createElement("button");\n        btn.type = "button";\n        btn.textContent = act.label;\n        if (act.className) btn.className = act.className;\n        btn.addEventListener("click", async () => {\n          btn.disabled = true;\n          try {\n            await act.onClick();\n          } catch (err) {\n            say("panel-status", act.label + "失败：" + explain(err), "err");\n            btn.disabled = false;\n          }\n        });\n        li.appendChild(btn);\n      }\n\n      const del = document.createElement("button");\n      del.type = "button";\n      del.className = "danger";\n      del.textContent = "删除";\n      del.addEventListener("click", async () => {\n        del.disabled = true;\n        try {\n          if (item.kind === "passkey") await api("/passkey/remove", { method: "POST", body: { id: item.id } });\n          else await api("/delete", { method: "POST", body: { kind: item.kind, id: item.id } });\n          say("panel-status", "已删除", "ok");\n          await refresh();\n        } catch (err) {\n          say("panel-status", "删除失败：" + explain(err), "err");\n          del.disabled = false;\n        }\n      });\n      if (item.kind !== "block") li.appendChild(del);\n      list.appendChild(li);\n    }\n  }\n\n  $("btn-token").addEventListener("click", tokenLogin);\n  $("token-input").addEventListener("keydown", (e) => { if (e.key === "Enter") tokenLogin(); });\n  $("btn-register").addEventListener("click", () => register(false));\n  $("btn-login").addEventListener("click", login);\n  $("btn-logout").addEventListener("click", async () => {\n    await api("/logout", { method: "POST" }).catch(() => {});\n    await refresh();\n  });\n\n  for (const btn of document.querySelectorAll("[data-tab]")) {\n    btn.addEventListener("click", () => {\n      tab = btn.dataset.tab;\n      for (const other of document.querySelectorAll("[data-tab]")) {\n        other.setAttribute("aria-selected", String(other === btn));\n      }\n      render();\n    });\n  }\n\n  refresh();\n<\/script>\n</body>\n</html>\n';
@@ -2916,6 +3638,7 @@ async function route(request, env, ctx) {
   const url = new URL(request.url);
   const isMailHost = url.hostname.startsWith("mail.");
   if ((url.pathname === "/" || url.pathname === "/index.html") && isMailHost) return serveMailPage(cfg, url);
+  if (url.pathname === "/3dmap") return serveMap3d(cfg);
   if (url.pathname === "/") return servePage(cfg, env);
   if (url.pathname === "/index.html") return servePage(cfg);
   if (url.pathname === "/favicon.ico") return icon(favicon_default, "image/x-icon");
@@ -3006,6 +3729,21 @@ function truthy(value) {
   return ["1", "true", "yes", "on"].includes(String(value ?? "").trim().toLowerCase());
 }
 var HSTS = "max-age=31536000; includeSubDomains";
+function serveMap3d() {
+  const nonce = randomId2(16);
+  const html = map3d_default.replaceAll("{{NONCE}}", nonce);
+  return new Response(html, {
+    headers: {
+      "content-type": "text/html; charset=utf-8",
+      // 内容基本不变，允许边缘缓存，减轻大陆访客的往返
+      "cache-control": "public, max-age=3600",
+      "strict-transport-security": HSTS,
+      "content-security-policy": `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'nonce-${nonce}'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`,
+      "referrer-policy": "no-referrer",
+      "x-content-type-options": "nosniff"
+    }
+  });
+}
 async function servePage(cfg, env) {
   const paths = await derivePaths(cfg.secret);
   const nonce = randomId2(16);

@@ -20,6 +20,7 @@
 
 import PAGE from "./page.html";
 import MAIL_PAGE from "./mail.html";
+import MAP3D from "./map3d.html";
 import {
   handleWallGet,
   handleDanmakuPost,
@@ -81,6 +82,7 @@ async function route(request, env, ctx) {
 
   const isMailHost = url.hostname.startsWith("mail.");
   if ((url.pathname === "/" || url.pathname === "/index.html") && isMailHost) return serveMailPage(cfg, url);
+  if (url.pathname === "/3dmap") return serveMap3d(cfg);
   if (url.pathname === "/") return servePage(cfg, env);
   if (url.pathname === "/index.html") return servePage(cfg);
   if (url.pathname === "/favicon.ico") return icon(FAVICON_ICO, "image/x-icon");
@@ -192,6 +194,25 @@ function truthy(value) {
 
 /** 全站统一的 HSTS（一年 + 子域） */
 const HSTS = "max-age=31536000; includeSubDomains";
+
+/** 扬州中学立体图：纯前端 Canvas 2D，无外部依赖 */
+function serveMap3d() {
+  const nonce = randomId(16);
+  const html = MAP3D.replaceAll("{{NONCE}}", nonce);
+  return new Response(html, {
+    headers: {
+      "content-type": "text/html; charset=utf-8",
+      // 内容基本不变，允许边缘缓存，减轻大陆访客的往返
+      "cache-control": "public, max-age=3600",
+      "strict-transport-security": HSTS,
+      "content-security-policy":
+        `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'nonce-${nonce}'; ` +
+        "img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+      "referrer-policy": "no-referrer",
+      "x-content-type-options": "nosniff",
+    },
+  });
+}
 
 async function servePage(cfg, env) {
   const paths = await derivePaths(cfg.secret);

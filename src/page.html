@@ -371,6 +371,9 @@
     animation: reveal 1s .44s var(--ease) both;
   }
   .gallery-entry:hover { border-color: var(--hair-strong); background: var(--hover-fill); }
+  a.gallery-entry { text-decoration: none; }
+  a.gallery-entry .gallery-chev { transition: transform .3s var(--ease); }
+  a.gallery-entry:hover .gallery-chev { transform: translateX(3px); }
   .gallery-entry:focus-visible { outline: 2px solid var(--hair-strong); outline-offset: 3px; }
   .gallery-kicker {
     flex: none; font-family: var(--mono); font-size: 9.5px; letter-spacing: .2em;
@@ -599,6 +602,12 @@
     </a>
     <p class="dest">{{HOST}}</p>
   </div>
+
+  <a class="gallery-entry model-entry" href="/3dmap">
+    <span class="gallery-kicker">Model</span>
+    <span class="gallery-title">扬州中学立体图<small>单击前往</small></span>
+    <svg class="gallery-chev" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+  </a>
 
   <button class="gallery-entry" type="button" id="gallery-open" aria-haspopup="dialog" aria-controls="lightbox">
     <span class="gallery-kicker">Gallery</span>
