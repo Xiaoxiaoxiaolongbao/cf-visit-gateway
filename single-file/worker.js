@@ -3888,14 +3888,16 @@ async function serveDownload(request, env, name) {
   const obj = await env.UPLOADS.getWithMetadata(`dl:${name.toLowerCase()}`, { type: "arrayBuffer" });
   if (!obj || !obj.value) return notFound2();
   const type = obj.metadata && obj.metadata.contentType || guessType(name);
+  const isManifest = /^(application\/json|text\/)/.test(type);
   const headers = new Headers({
     "content-type": type,
-    "content-disposition": `attachment; filename="${name}"; filename*=UTF-8''${encodeURIComponent(name)}`,
-    "cache-control": "public, max-age=31536000, immutable",
+    "content-disposition": isManifest ? `inline; filename="${name}"; filename*=UTF-8''${encodeURIComponent(name)}` : `attachment; filename="${name}"; filename*=UTF-8''${encodeURIComponent(name)}`,
+    "cache-control": isManifest ? "public, max-age=60, must-revalidate" : "public, max-age=31536000, immutable",
     "x-robots-tag": "noindex, nofollow",
     "x-content-type-options": "nosniff",
     "strict-transport-security": HSTS,
-    "referrer-policy": "no-referrer"
+    "referrer-policy": "no-referrer",
+    "access-control-allow-origin": "*"
   });
   if (request.method === "HEAD") return new Response(null, { headers });
   return new Response(obj.value, { headers });
