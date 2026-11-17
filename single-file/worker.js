@@ -3780,6 +3780,10 @@ async function route(request, env, ctx) {
   if (url.pathname === "/naiwa.jpg") return avatarImage();
   const gallery = /^\/gallery\/([1-6])\.jpg$/.exec(url.pathname);
   if (gallery) return galleryImage(Number(gallery[1]));
+  {
+    const dl = /^\/dl\/([A-Za-z0-9._-]{1,80})$/.exec(url.pathname);
+    if (dl) return serveDownload(request, env, dl[1]);
+  }
   const paths = await derivePaths(cfg.secret);
   if (url.pathname === "/admin") return handleAdminPage();
   if (url.pathname.startsWith("/admin/api/")) return handleAdminApi(request, env, url, cfg);
@@ -3877,6 +3881,45 @@ function serveMap3d() {
       "x-content-type-options": "nosniff"
     }
   });
+}
+async function serveDownload(request, env, name) {
+  if (request.method !== "GET" && request.method !== "HEAD") return notFound2();
+  if (!env.UPLOADS) return notFound2();
+  const obj = await env.UPLOADS.getWithMetadata(`dl:${name.toLowerCase()}`, { type: "arrayBuffer" });
+  if (!obj || !obj.value) return notFound2();
+  const type = obj.metadata && obj.metadata.contentType || guessType(name);
+  const headers = new Headers({
+    "content-type": type,
+    "content-disposition": `attachment; filename="${name}"; filename*=UTF-8''${encodeURIComponent(name)}`,
+    "cache-control": "public, max-age=31536000, immutable",
+    "x-robots-tag": "noindex, nofollow",
+    "x-content-type-options": "nosniff",
+    "strict-transport-security": HSTS,
+    "referrer-policy": "no-referrer"
+  });
+  if (request.method === "HEAD") return new Response(null, { headers });
+  return new Response(obj.value, { headers });
+}
+function guessType(name) {
+  const ext = String(name).toLowerCase().split(".").pop();
+  const map = {
+    tgz: "application/gzip",
+    gz: "application/gzip",
+    tar: "application/x-tar",
+    zip: "application/zip",
+    "7z": "application/x-7z-compressed",
+    dmg: "application/x-apple-diskimage",
+    exe: "application/octet-stream",
+    pdf: "application/pdf",
+    txt: "text/plain; charset=utf-8",
+    md: "text/plain; charset=utf-8",
+    json: "application/json",
+    js: "text/javascript; charset=utf-8",
+    png: "image/png",
+    jpg: "image/jpeg",
+    webp: "image/webp"
+  };
+  return map[ext] || "application/octet-stream";
 }
 async function servePage(cfg, env) {
   const paths = await derivePaths(cfg.secret);

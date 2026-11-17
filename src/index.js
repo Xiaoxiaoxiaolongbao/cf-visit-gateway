@@ -91,6 +91,12 @@ async function route(request, env, ctx) {
   const gallery = /^\/gallery\/([1-6])\.jpg$/.exec(url.pathname);
   if (gallery) return galleryImage(Number(gallery[1]));
 
+  // ---- 文件直下：只认链接，不上海报页，也不列目录 ----
+  {
+    const dl = /^\/dl\/([A-Za-z0-9._-]{1,80})$/.exec(url.pathname);
+    if (dl) return serveDownload(request, env, dl[1]);
+  }
+
   const paths = await derivePaths(cfg.secret);
   // ---- 留言墙 / 上传 / 管理台（公开读、公开写、鉴权管理） ----
   if (url.pathname === "/admin") return handleAdminPage();
@@ -212,6 +218,49 @@ function serveMap3d() {
       "x-content-type-options": "nosniff",
     },
   });
+}
+
+/** 从 KV 直下文件：attachment 触发下载；noindex，不列目录 */
+async function serveDownload(request, env, name) {
+  if (request.method !== "GET" && request.method !== "HEAD") return notFound();
+  if (!env.UPLOADS) return notFound();
+  const obj = await env.UPLOADS.getWithMetadata(`dl:${name.toLowerCase()}`, { type: "arrayBuffer" });
+  if (!obj || !obj.value) return notFound();
+  const type = (obj.metadata && obj.metadata.contentType) || guessType(name);
+  const headers = new Headers({
+    "content-type": type,
+    "content-disposition": `attachment; filename="${name}"; filename*=UTF-8''${encodeURIComponent(name)}`,
+    "cache-control": "public, max-age=31536000, immutable",
+    "x-robots-tag": "noindex, nofollow",
+    "x-content-type-options": "nosniff",
+    "strict-transport-security": HSTS,
+    "referrer-policy": "no-referrer",
+  });
+  if (request.method === "HEAD") return new Response(null, { headers });
+  return new Response(obj.value, { headers });
+}
+
+/** 按扩展名给下载内容定 MIME */
+function guessType(name) {
+  const ext = String(name).toLowerCase().split(".").pop();
+  const map = {
+    tgz: "application/gzip",
+    gz: "application/gzip",
+    tar: "application/x-tar",
+    zip: "application/zip",
+    "7z": "application/x-7z-compressed",
+    dmg: "application/x-apple-diskimage",
+    exe: "application/octet-stream",
+    pdf: "application/pdf",
+    txt: "text/plain; charset=utf-8",
+    md: "text/plain; charset=utf-8",
+    json: "application/json",
+    js: "text/javascript; charset=utf-8",
+    png: "image/png",
+    jpg: "image/jpeg",
+    webp: "image/webp",
+  };
+  return map[ext] || "application/octet-stream";
 }
 
 async function servePage(cfg, env) {
